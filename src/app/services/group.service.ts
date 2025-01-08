@@ -166,20 +166,39 @@ export class GroupService {
       // Remove the expense
       const updatedExpenses = group.expenses.filter((e) => e.id !== expenseId);
 
-      // Create a copy of the group with updated expenses
-      const updatedGroup: Group = {
+      // Create a copy of the group
+      let updatedGroup: Group = {
         ...group,
         expenses: updatedExpenses,
+        // Reset all balances to 0 first
+        members: group.members.map((member) => ({
+          ...member,
+          balance: 0,
+        })),
       };
 
-      // Recalculate balances
-      this.calculateBalances(updatedGroup);
+      // Recalculate all balances from remaining expenses
+      updatedExpenses.forEach((expense) => {
+        updatedGroup.members.forEach((member) => {
+          // Add what they paid
+          const amountPaid = expense.payers
+            .filter((payer) => payer.memberId === member.id)
+            .reduce((sum, payer) => sum + payer.amount, 0);
 
-      // Recalculate settlement suggestions
+          // Subtract what they owe
+          const share =
+            expense.participants.find((p) => p.memberId === member.id)?.share ||
+            0;
+
+          member.balance += amountPaid - share;
+        });
+      });
+
+      // Recalculate settlement suggestions with new balances
       const newSettlements = this.getSettlementSuggestions(updatedGroup);
 
-      // Update the group and settlements
-      this.currentGroup.next(updatedGroup);
+      // Save everything
+      this.saveGroup(updatedGroup);
       this.settlements.next(newSettlements);
     });
   }

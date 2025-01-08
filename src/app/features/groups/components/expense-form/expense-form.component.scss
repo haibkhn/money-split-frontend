@@ -140,6 +140,8 @@
           .member-name {
             flex: 1;
             font-weight: 500;
+            text-align: right; /* Center-align the name */
+            margin-right: 1rem; /* Add spacing from the input */
           }
 
           .amount-input-container {
@@ -176,6 +178,7 @@
             align-items: center;
             gap: 0.5rem;
             cursor: pointer;
+            justify-content: center;
             margin: 0;
             padding: 0.5rem;
             border-radius: 4px;
