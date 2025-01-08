@@ -20,18 +20,27 @@
       </div>
 
       <div class="form-group">
-        <label for="totalAmount">Total Amount</label>
-        <input
-          type="number"
-          id="totalAmount"
-          [(ngModel)]="expense.totalAmount"
-          (ngModelChange)="onAmountChange($event)"
-          name="totalAmount"
-          required
-          min="0"
-          step="0.01"
-        />
-        <!-- Show converted amount if different currency -->
+        <label>Total Amount</label>
+        <div class="amount-input-group">
+          <select
+            [(ngModel)]="expense.currency"
+            name="currency"
+            (ngModelChange)="updateAmountAndShares()"
+          >
+            <option *ngFor="let currency of currencies" [value]="currency.code">
+              {{ currency.code }}
+            </option>
+          </select>
+          <input
+            type="text"
+            id="totalAmount"
+            [value]="formatNumber(expense.totalAmount)"
+            (input)="onAmountInput($event)"
+            name="totalAmount"
+            required
+            placeholder="0.00"
+          />
+        </div>
         <div
           class="converted-amount"
           *ngIf="
@@ -44,159 +53,121 @@
         </div>
       </div>
 
-      <div
-        class="form-group"
-        [class.has-conversion]="expense.currency !== (group$ | async)?.currency"
-      >
-        <label for="currency">Currency</label>
-        <select
-          id="currency"
-          [(ngModel)]="expense.currency"
-          (ngModelChange)="updateAmountAndShares()"
-          name="currency"
-          [disabled]="isLoading"
-        >
-          <option *ngFor="let currency of currencies" [value]="currency.code">
-            {{ currency.code }} - {{ currency.name }}
-          </option>
-        </select>
-        <div
-          class="currency-info"
-          *ngIf="
-            expense.convertedAmount &&
-            expense.currency !== (group$ | async)?.currency
-          "
-        >
-          ≈
-          {{ expense.convertedAmount | currency : (group$ | async)?.currency }}
-        </div>
-      </div>
+      <div class="split-sections">
+        <!-- Paid By Section -->
+        <div class="form-group">
+          <label>Paid By</label>
+          <div class="payer-type-toggle">
+            <button
+              type="button"
+              (click)="togglePayerType(false)"
+              [class.active]="!isMultiplePayers"
+            >
+              Single Payer
+            </button>
+            <button
+              type="button"
+              (click)="togglePayerType(true)"
+              [class.active]="isMultiplePayers"
+            >
+              Multiple Payers
+            </button>
+          </div>
 
-      <!-- Paid By Section -->
-      <div class="form-group">
-        <label>Paid By</label>
-        <div class="payer-type-toggle">
-          <button
-            type="button"
-            (click)="isMultiplePayers = false"
-            [class.active]="!isMultiplePayers"
-            title="Switch to Single Payer"
-          >
-            Single Payer
-          </button>
-          <button
-            type="button"
-            (click)="isMultiplePayers = true"
-            [class.active]="isMultiplePayers"
-            title="Switch to Multiple Payers"
-          >
-            Multiple Payers
-          </button>
-        </div>
-
-        <!-- Single Payer -->
-        <div *ngIf="!isMultiplePayers" class="single-payer">
-          <label for="singlePayer">Select who paid</label>
-          <select
-            id="singlePayer"
-            [(ngModel)]="expense.payers[0].memberId"
-            name="singlePayer"
-            required
-            aria-label="Select who paid"
-          >
-            <option value="">Select who paid</option>
-            <option *ngFor="let member of group.members" [value]="member.id">
-              {{ member.name }}
-            </option>
-          </select>
-        </div>
-
-        <!-- Multiple Payers -->
-        <div *ngIf="isMultiplePayers" class="multiple-payers">
-          <div
-            *ngFor="let payer of expense.payers; let i = index"
-            class="payer-row"
-          >
-            <label for="payer{{ i }}">Select payer</label>
+          <!-- Single Payer -->
+          <div *ngIf="!isMultiplePayers" class="single-payer">
+            <label for="singlePayer">Select who paid</label>
             <select
-              id="payer{{ i }}"
-              [(ngModel)]="payer.memberId"
-              [name]="'payer' + i"
-              aria-label="Select payer"
+              id="singlePayer"
+              [(ngModel)]="expense.payers[0].memberId"
+              name="singlePayer"
+              required
+              aria-label="Select who paid"
             >
               <option value="">Select who paid</option>
               <option *ngFor="let member of group.members" [value]="member.id">
                 {{ member.name }}
               </option>
             </select>
-            <input
-              type="number"
-              [(ngModel)]="payer.amount"
-              [name]="'amount' + i"
-              min="0"
-              step="0.01"
-              placeholder="Enter amount"
-              aria-label="Enter amount paid"
-            />
+          </div>
+
+          <!-- Multiple Payers -->
+          <div *ngIf="isMultiplePayers" class="multiple-payers">
+            <!-- Payment progress -->
+            <div class="payment-progress" *ngIf="group$ | async as group">
+              <span class="progress-text">
+                {{ formatNumber(getTotalPaid()) }} of
+                {{ formatNumber(expense.totalAmount) }}
+                {{ expense.currency }} paid
+              </span>
+              <span
+                class="remaining-text"
+                [class.warning]="getRemainingAmount() > 0"
+              >
+                {{ formatNumber(getRemainingAmount()) }}
+                {{ expense.currency }} remaining
+              </span>
+            </div>
+
+            <!-- Payer rows -->
+            <div
+              class="payer-row"
+              *ngFor="let member of (group$ | async)?.members || []"
+            >
+              <span class="member-name">{{ member.name }}</span>
+              <div class="amount-input-container">
+                <input
+                  type="text"
+                  [ngModel]="getMemberPayment(member.id).amount || ''"
+                  (input)="onPayerAmountInput($event, member.id)"
+                  [name]="'amount_' + member.id"
+                  placeholder="0"
+                />
+                <span class="currency-label">{{ expense.currency }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Paid For Section -->
+        <div class="form-group">
+          <label>Paid For</label>
+          <div class="participant-type-toggle">
             <button
               type="button"
-              class="remove-button"
-              (click)="removePayer(i)"
-              title="Remove payer"
+              (click)="includeEveryone = true"
+              [class.active]="includeEveryone"
+              title="Include Everyone"
             >
-              ×
+              Everyone
+            </button>
+            <button
+              type="button"
+              (click)="includeEveryone = false"
+              [class.active]="!includeEveryone"
+              title="Select Specific People"
+            >
+              Select People
             </button>
           </div>
-          <button
-            type="button"
-            class="add-payer-button"
-            (click)="addPayer()"
-            title="Add another payer"
-          >
-            Add Another Payer
-          </button>
-        </div>
-      </div>
 
-      <!-- Paid For Section -->
-      <div class="form-group">
-        <label>Paid For</label>
-        <div class="participant-type-toggle">
-          <button
-            type="button"
-            (click)="includeEveryone = true"
-            [class.active]="includeEveryone"
-            title="Include Everyone"
-          >
-            Everyone
-          </button>
-          <button
-            type="button"
-            (click)="includeEveryone = false"
-            [class.active]="!includeEveryone"
-            title="Select Specific People"
-          >
-            Select People
-          </button>
-        </div>
-
-        <div *ngIf="!includeEveryone" class="participant-selection">
-          <div
-            *ngFor="let member of group.members"
-            class="participant-checkbox"
-          >
-            <label>
-              <input
-                type="checkbox"
-                [checked]="isParticipantSelected(member.id)"
-                (change)="toggleParticipant(member.id)"
-              />
-              {{ member.name }}
-            </label>
+          <div *ngIf="!includeEveryone" class="participant-selection">
+            <div
+              *ngFor="let member of group.members"
+              class="participant-checkbox"
+            >
+              <label>
+                <input
+                  type="checkbox"
+                  [checked]="isParticipantSelected(member.id)"
+                  (change)="toggleParticipant(member.id)"
+                />
+                {{ member.name }}
+              </label>
+            </div>
           </div>
         </div>
       </div>
-
       <!-- Date -->
       <div class="form-group">
         <label for="expenseDate">Date</label>

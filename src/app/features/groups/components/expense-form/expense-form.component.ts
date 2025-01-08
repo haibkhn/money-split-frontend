@@ -15,6 +15,7 @@ import { CurrencyService } from '../../../../services/currency.service';
   styleUrls: ['./expense-form.component.scss'],
 })
 export class ExpenseFormComponent {
+  [x: string]: any;
   private groupService = inject(GroupService);
   private currencyService = inject(CurrencyService);
   private ngZone = inject(NgZone);
@@ -167,11 +168,31 @@ export class ExpenseFormComponent {
       return;
     }
 
+    // Perform validation only if "Multiple Payers" is selected
+    if (this.isMultiplePayers) {
+      const totalFromPayers = this.expense.payers.reduce(
+        (sum, payer) => sum + (payer.amount || 0),
+        0
+      );
+
+      // Check if totals match (allowing for small floating point differences)
+      if (Math.abs(totalFromPayers - this.expense.totalAmount) > 0.01) {
+        alert(
+          `Total amount (${this.formatNumber(
+            this.expense.totalAmount
+          )}) doesn't match sum of individual payments (${this.formatNumber(
+            totalFromPayers
+          )})`
+        );
+        return;
+      }
+    }
+
     this.group$.pipe(take(1)).subscribe(async (group) => {
       if (!group) return;
 
       try {
-        // Create the new expense first
+        // Create the new expense
         const newExpense = {
           id: Date.now().toString(),
           description: this.expense.description,
@@ -216,7 +237,7 @@ export class ExpenseFormComponent {
           }));
         }
 
-        // Update payer amounts if needed
+        // Update payer amounts for single payer
         if (!this.isMultiplePayers) {
           newExpense.payers = [
             {
@@ -326,8 +347,12 @@ export class ExpenseFormComponent {
   }
 
   // For display in the input
+  // Helper function to format numbers with commas
   formatNumber(value: number): string {
-    return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return value.toLocaleString('en-US', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    });
   }
 
   // For parsing the input value
@@ -337,18 +362,19 @@ export class ExpenseFormComponent {
 
   onAmountInput(event: Event) {
     const input = event.target as HTMLInputElement;
-    let value = input.value.replace(/[^\d,]/g, ''); // Remove non-digits and non-commas
 
-    // Remove extra commas and format
-    value = value.replace(/,/g, '');
-    if (value) {
-      const number = parseInt(value);
-      this.displayAmount = this.formatNumber(number);
-    } else {
-      this.displayAmount = '';
-    }
+    // Remove any non-numeric characters except decimal point
+    const rawValue = input.value.replace(/[^\d.]/g, '');
 
-    this.updatePayerAmount();
+    // Parse the value as a float for calculations
+    const numericValue = parseFloat(rawValue) || 0;
+    this.expense.totalAmount = numericValue;
+
+    // Format the value with commas for display
+    input.value = this.formatNumber(numericValue);
+
+    // Trigger conversion update
+    this.updateAmountAndShares();
   }
 
   // Add a watcher for amount changes
@@ -358,5 +384,92 @@ export class ExpenseFormComponent {
       // Only convert if currency is selected
       await this.updateAmountAndShares();
     }
+  }
+
+  onPayerAmountInput(event: Event, memberId: string) {
+    const input = event.target as HTMLInputElement;
+    let value = input.value;
+
+    // Format the display value
+    const formattedValue = this.formatNumberInput(value);
+    input.value = formattedValue;
+
+    // Update payer amount
+    const payer = this.expense.payers.find((p) => p.memberId === memberId);
+    if (payer) {
+      payer.amount = parseFloat(value.replace(/,/g, '')) || 0;
+    }
+  }
+
+  getTotalPaid(): number {
+    return this.expense.payers.reduce(
+      (sum, payer) => sum + (payer.amount || 0),
+      0
+    );
+  }
+
+  getRemainingAmount(): number {
+    return Math.max(0, this.expense.totalAmount - this.getTotalPaid());
+  }
+
+  getMemberPayment(memberId: string) {
+    let payer = this.expense.payers.find((p) => p.memberId === memberId);
+    if (!payer) {
+      payer = { memberId, amount: 0 };
+      this.expense.payers.push(payer);
+    }
+    return payer;
+  }
+
+  togglePayerType(isMultiple: boolean) {
+    this.isMultiplePayers = isMultiple;
+
+    if (this.isMultiplePayers) {
+      this.group$.pipe(take(1)).subscribe((group) => {
+        if (group) {
+          // Initialize all members with 0 amount
+          this.expense.payers = group.members.map((member) => ({
+            memberId: member.id,
+            amount: 0,
+          }));
+        }
+      });
+    } else {
+      // Reset to single payer
+      this.expense.payers = [{ memberId: '', amount: 0 }];
+    }
+  }
+
+  // For payment progress display
+  getProgressText(): string {
+    const totalPaid = this.getTotalPaid();
+    const total = this.expense.totalAmount;
+
+    return `${this.formatNumber(totalPaid)} of ${this.formatNumber(total)} ${
+      this.expense.currency
+    } paid`;
+  }
+
+  // Add this to your component
+  isPaymentTotalValid(): boolean {
+    const totalPaid = this.getTotalPaid();
+    return Math.abs(totalPaid - this.expense.totalAmount) < 0.01;
+  }
+
+  formatNumberInput(value: string): string {
+    // Remove existing commas and non-numeric characters except decimal
+    value = value.replace(/,/g, '').replace(/[^\d.]/g, '');
+
+    // If empty or just decimal point, return empty
+    if (!value || value === '.') return '';
+
+    // Split number into integer and decimal parts
+    let [integer, decimal] = value.split('.');
+
+    // Add commas to integer part
+    integer = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+    // Return with decimal if exists
+    return decimal ? `${integer}.${decimal}` : integer;
   }
 }

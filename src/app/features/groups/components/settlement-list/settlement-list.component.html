@@ -10,7 +10,9 @@
           <span class="from">{{ getMemberName(group, settlement.from) }}</span>
           <span class="arrow">→</span>
           <span class="to">{{ getMemberName(group, settlement.to) }}</span>
-          <span class="amount">{{ settlement.amount | currency }}</span>
+          <span class="amount">{{
+            settlement.amount | currency : group.currency
+          }}</span>
         </div>
       </div>
 

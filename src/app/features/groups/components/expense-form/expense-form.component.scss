@@ -6,7 +6,7 @@
   .add-button {
     width: 100%;
     padding: 1rem;
-    background-color: #4CAF50;
+    background-color: #4caf50;
     color: white;
     border: none;
     border-radius: 6px;
@@ -37,7 +37,8 @@
         font-weight: 500;
       }
 
-      input, select {
+      input,
+      select {
         width: 100%;
         height: 42px;
         padding: 0.75rem;
@@ -49,7 +50,29 @@
 
         &:focus {
           outline: none;
-          border-color: #4CAF50;
+          border-color: #4caf50;
+        }
+
+        &:disabled {
+          background-color: #f5f5f5;
+          cursor: not-allowed;
+        }
+      }
+
+      // Total amount input field
+      .amount-input-group {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+
+        select {
+          width: 80px;
+          flex: none;
+        }
+
+        input {
+          flex-grow: 1; /* Stretch to the end */
+          max-width: none;
         }
       }
 
@@ -70,9 +93,9 @@
           transition: all 0.2s;
 
           &.active {
-            background: #4CAF50;
+            background: #4caf50;
             color: white;
-            border-color: #4CAF50;
+            border-color: #4caf50;
           }
 
           &:hover:not(.active) {
@@ -83,54 +106,60 @@
 
       // Multiple payers section
       .multiple-payers {
-        .payer-row {
+        .payment-progress {
+          background: #f8fafc;
+          padding: 0.75rem;
+          border-radius: 4px;
+          margin-bottom: 1rem;
           display: flex;
-          gap: 0.5rem;
-          margin-bottom: 0.5rem;
+          justify-content: space-between;
           align-items: center;
+          font-size: 0.9rem;
 
-          select {
-            flex: 2;
+          .progress-text {
+            color: #333;
           }
 
-          input {
-            flex: 1;
-          }
-
-          .remove-button {
-            width: 32px;
-            height: 32px;
-            border: none;
-            background: #f0f0f0;
-            color: #666;
-            border-radius: 4px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-
-            &:hover {
-              background: #fee2e2;
+          .remaining-text {
+            &.warning {
               color: #ef4444;
             }
           }
         }
 
-        .add-payer-button {
-          width: 100%;
-          padding: 0.5rem;
-          margin-top: 0.5rem;
-          background: #f0f0f0;
-          border: 1px dashed #ccc;
-          border-radius: 4px;
-          color: #666;
-          cursor: pointer;
-          transition: all 0.2s;
+        .payer-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 0.5rem 0;
 
           &:hover {
-            background: #e0e0e0;
-            border-color: #999;
+            background-color: #f9fafb;
+          }
+
+          .member-name {
+            flex: 1;
+            font-weight: 500;
+          }
+
+          .amount-input-container {
+            width: 50%; /* Start from the middle */
+            position: relative;
+
+            input {
+              width: 100%;
+              text-align: left;
+              padding-right: 3rem;
+            }
+
+            .currency-label {
+              position: absolute;
+              right: 0.75rem;
+              top: 50%;
+              transform: translateY(-50%);
+              color: #666;
+              font-size: 0.9rem;
+            }
           }
         }
       }
@@ -156,36 +185,12 @@
               background-color: #f5f5f5;
             }
 
-            input[type="checkbox"] {
+            input[type='checkbox'] {
               width: auto;
               height: auto;
               margin: 0;
             }
           }
-        }
-      }
-
-      .currency-info {
-        margin-top: 0.5rem;
-        font-size: 0.9rem;
-        color: #666;
-      }
-
-      select {
-        // Your existing select styles are already good
-        // Just add the disabled state
-        &:disabled {
-          background-color: #f5f5f5;
-          cursor: not-allowed;
-        }
-      }
-
-      // If currency is different from group currency,
-      // make the converted amount more visible
-      &.has-conversion {
-        .currency-info {
-          font-weight: 500;
-          color: #4CAF50;
         }
       }
 
@@ -196,7 +201,7 @@
       }
     }
 
-    // Button group at bottom
+    // Button group styling
     .button-group {
       display: flex;
       gap: 1rem;
@@ -211,8 +216,8 @@
         cursor: pointer;
         transition: all 0.2s;
 
-        &[type="submit"] {
-          background-color: #4CAF50;
+        &[type='submit'] {
+          background-color: #4caf50;
           color: white;
 
           &:hover:not(:disabled) {
@@ -236,44 +241,59 @@
       }
     }
   }
-}
 
-// Responsive adjustments
-@media (max-width: 768px) {
-  .expense-form {
-    .form-container {
-      .form-group {
-        // Toggle buttons stack on mobile
-        .payer-type-toggle,
-        .participant-type-toggle {
-          flex-direction: column;
-          gap: 0.5rem;
-        }
+  // Mobile styles
+  @media (max-width: 768px) {
+    .form-container .form-group {
+      // Toggle buttons stack on mobile
+      .payer-type-toggle,
+      .participant-type-toggle {
+        flex-direction: column;
+        gap: 0.5rem;
+      }
 
-        // Multiple payers become more compact
-        .multiple-payers .payer-row {
-          flex-direction: column;
-          gap: 0.5rem;
-          padding-bottom: 1rem;
-          border-bottom: 1px solid #eee;
-          margin-bottom: 1rem;
+      .amount-input-group {
+        flex-direction: column;
+        gap: 1rem;
 
-          select, 
-          input {
-            width: 100%;
-          }
-        }
-
-        // Make checkboxes easier to tap
-        .participant-selection .participant-checkbox label {
-          padding: 0.75rem;
+        input,
+        select {
+          width: 100%;
+          max-width: none;
         }
       }
 
-      // Stack buttons on mobile
-      .button-group {
+      // Multiple payers become more compact
+      .multiple-payers .payer-row {
         flex-direction: column;
+        align-items: flex-start;
         gap: 0.5rem;
+        padding: 1rem 0;
+        border-bottom: 1px solid #eee;
+
+        .member-name {
+          margin-right: 0;
+          margin-bottom: 0.5rem;
+        }
+
+        .amount-input-container {
+          width: 100%;
+        }
+      }
+
+      // Make checkboxes easier to tap
+      .participant-selection .participant-checkbox label {
+        padding: 0.75rem;
+      }
+    }
+
+    // Stack buttons on mobile
+    .button-group {
+      flex-direction: column;
+      gap: 0.5rem;
+
+      button {
+        width: 100%;
       }
     }
   }
