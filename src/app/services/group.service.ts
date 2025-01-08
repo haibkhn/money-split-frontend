@@ -96,22 +96,21 @@ export class GroupService {
     this.currentGroup$.pipe(take(1)).subscribe((group) => {
       if (!group) return;
 
-      // Deep copy of members to calculate new balances
+      console.log('Adding expense:', expense);
+
       const updatedMembers = group.members.map((member) => {
-        // Calculate what they paid (in group's currency)
+        // Calculate what they paid
         const amountPaid = expense.payers
           .filter((payer) => payer.memberId === member.id)
           .reduce((sum, payer) => sum + payer.amount, 0);
 
-        // Calculate what they owe (in group's currency)
+        // Calculate what they owe
         const share =
           expense.participants.find((p) => p.memberId === member.id)?.share ||
           0;
 
-        // Calculate new balance
         return {
           ...member,
-          // Add what they paid, subtract what they owe
           balance: (member.balance || 0) + amountPaid - share,
         };
       });
@@ -122,10 +121,10 @@ export class GroupService {
         members: updatedMembers,
       };
 
-      // Save and update the group
+      console.log('Updated group after adding expense:', updatedGroup);
+
       this.saveGroup(updatedGroup);
 
-      // Clear existing settlements and recalculate
       const newSettlements = this.getSettlementSuggestions(updatedGroup);
       this.settlements.next(newSettlements);
     });
@@ -191,6 +190,7 @@ export class GroupService {
       ...member,
       balance: 0,
     }));
+    console.log('Balances reset:', updatedMembers);
 
     // Recalculate all balances from expenses
     group.expenses.forEach((expense) => {
@@ -208,6 +208,8 @@ export class GroupService {
         member.balance = member.balance + amountPaid - share;
       });
     });
+
+    console.log('Balances after calculation:', updatedMembers);
 
     // Update the group with new balances
     const updatedGroup = {

@@ -22,15 +22,26 @@
       <div class="form-group">
         <label for="totalAmount">Total Amount</label>
         <input
-          type="text"
+          type="number"
           id="totalAmount"
-          [value]="displayAmount"
-          (input)="onAmountInput($event)"
-          (blur)="updatePayerAmount()"
+          [(ngModel)]="expense.totalAmount"
+          (ngModelChange)="onAmountChange($event)"
           name="totalAmount"
-          placeholder="0.00"
           required
+          min="0"
+          step="0.01"
         />
+        <!-- Show converted amount if different currency -->
+        <div
+          class="converted-amount"
+          *ngIf="
+            expense.currency !== (group$ | async)?.currency &&
+            expense.convertedAmount
+          "
+        >
+          ≈
+          {{ expense.convertedAmount | currency : (group$ | async)?.currency }}
+        </div>
       </div>
 
       <div
@@ -90,6 +101,7 @@
             id="singlePayer"
             [(ngModel)]="expense.payers[0].memberId"
             name="singlePayer"
+            required
             aria-label="Select who paid"
           >
             <option value="">Select who paid</option>

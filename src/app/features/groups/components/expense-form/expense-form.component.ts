@@ -1,4 +1,4 @@
-import { Component, NgZone } from '@angular/core';
+import { ChangeDetectorRef, Component, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { inject } from '@angular/core';
@@ -18,6 +18,7 @@ export class ExpenseFormComponent {
   private groupService = inject(GroupService);
   private currencyService = inject(CurrencyService);
   private ngZone = inject(NgZone);
+  private cdr = inject(ChangeDetectorRef);
 
   group$ = this.groupService.currentGroup$;
   currencies: Currency[] = [];
@@ -42,6 +43,7 @@ export class ExpenseFormComponent {
 
   ngOnInit() {
     this.loadCurrencies();
+    this.initializeGroup();
   }
 
   loadCurrencies() {
@@ -55,6 +57,29 @@ export class ExpenseFormComponent {
         console.error('Failed to load currencies:', err);
         this.isLoading = false;
       },
+    });
+  }
+
+  initializeGroup() {
+    this.group$.subscribe((group) => {
+      console.log('Group loaded:', group);
+
+      if (group) {
+        if (this.includeEveryone) {
+          this.expense.participants = group.members.map((member) => ({
+            memberId: member.id,
+            share: this.expense.totalAmount / group.members.length,
+          }));
+        }
+
+        // Set default payer if `payers` array is empty or has no `memberId`
+        if (
+          group.members.length > 0 &&
+          this.expense.payers[0].memberId === ''
+        ) {
+          this.expense.payers[0].memberId = group.members[0].id;
+        }
+      }
     });
   }
 
@@ -100,6 +125,7 @@ export class ExpenseFormComponent {
       this.expense.participants.splice(index, 1);
     }
     this.updateParticipantShares();
+    console.log('Participants after toggle:', this.expense.participants);
   }
 
   updateParticipantShares() {
@@ -135,7 +161,7 @@ export class ExpenseFormComponent {
     }
   }
 
-  addExpense() {
+  async addExpense() {
     if (!this.expense.description || this.expense.totalAmount <= 0) {
       alert('Please enter a valid description and total amount.');
       return;
@@ -145,22 +171,64 @@ export class ExpenseFormComponent {
       if (!group) return;
 
       try {
-        // Ensure the amount is converted
-        await this.updateAmountAndShares();
-
-        // Create the expense with both original and converted amounts
+        // Create the new expense first
         const newExpense = {
           id: Date.now().toString(),
           description: this.expense.description,
           totalAmount: this.expense.totalAmount,
           currency: this.expense.currency,
           convertedAmount: this.expense.convertedAmount,
-          payers: this.expense.payers,
-          participants: this.expense.participants,
+          payers: [...this.expense.payers], // Create a copy
+          participants: [...this.expense.participants], // Create a copy
           date: this.expense.date,
           splitType: this.expense.splitType,
         };
 
+        // Log the expense state before conversion
+        console.log('Expense before conversion:', {
+          totalAmount: newExpense.totalAmount,
+          payers: newExpense.payers,
+          participants: newExpense.participants,
+        });
+
+        // Convert currency if needed
+        if (newExpense.currency !== group.currency) {
+          const converted = await this.currencyService
+            .convertCurrency(
+              newExpense.totalAmount,
+              newExpense.currency,
+              group.currency
+            )
+            .toPromise();
+
+          newExpense.convertedAmount = converted ?? newExpense.totalAmount;
+        } else {
+          newExpense.convertedAmount = newExpense.totalAmount;
+        }
+
+        // Update shares based on converted amount
+        if (this.includeEveryone) {
+          const perPersonShare =
+            newExpense.convertedAmount / group.members.length;
+          newExpense.participants = group.members.map((member) => ({
+            memberId: member.id,
+            share: perPersonShare,
+          }));
+        }
+
+        // Update payer amounts if needed
+        if (!this.isMultiplePayers) {
+          newExpense.payers = [
+            {
+              memberId: newExpense.payers[0].memberId,
+              amount: newExpense.convertedAmount,
+            },
+          ];
+        }
+
+        console.log('Final expense state:', newExpense);
+
+        // Add the expense
         this.groupService.addExpense(group.id, newExpense);
 
         setTimeout(() => {
@@ -168,8 +236,8 @@ export class ExpenseFormComponent {
           this.showForm = false;
         });
       } catch (error) {
-        alert('Failed to process expense. Please try again.');
         console.error('Error adding expense:', error);
+        alert('Failed to add expense. Please try again.');
       }
     });
   }
@@ -203,35 +271,54 @@ export class ExpenseFormComponent {
       if (!group) return;
 
       try {
-        // Convert amount to group's currency
-        const converted = await this.currencyService
-          .convertCurrency(
-            this.expense.totalAmount,
-            this.expense.currency,
-            group.currency
-          )
-          .toPromise();
+        // Only convert if currencies are different
+        if (this.expense.currency !== group.currency) {
+          const converted = await this.currencyService
+            .convertCurrency(
+              this.expense.totalAmount,
+              this.expense.currency,
+              group.currency
+            )
+            .toPromise();
 
-        // Add null check and default to 0 if conversion fails
-        this.expense.convertedAmount = converted ?? this.expense.totalAmount;
+          this.expense.convertedAmount = converted ?? this.expense.totalAmount;
+        } else {
+          this.expense.convertedAmount = this.expense.totalAmount;
+        }
 
-        // Update payer amounts
-        if (this.expense.payers.length > 0) {
+        // The condition we're checking
+        if (this.expense.payers.length > 0 && this.expense.payers[0].memberId) {
+          console.log('Updating payer amounts');
           const equalAmount =
             this.expense.convertedAmount / this.expense.payers.length;
           this.expense.payers.forEach((payer) => {
             payer.amount = equalAmount;
           });
+          console.log('Payer Amounts updated:', this.expense.payers);
+        } else {
+          console.log('Skipping payer amount update because:', {
+            'has payers': this.expense.payers.length > 0,
+            'has valid memberId': Boolean(this.expense.payers[0]?.memberId),
+          });
         }
 
-        // Update participant shares
-        if (this.expense.participants.length > 0) {
+        // Update participant shares only if we have participants
+        if (this.includeEveryone) {
+          // If everyone is included, add all members as participants
+          this.expense.participants = group.members.map((member) => ({
+            memberId: member.id,
+            share: this.expense.convertedAmount / group.members.length,
+          }));
+        } else if (this.expense.participants.length > 0) {
           const equalShare =
             this.expense.convertedAmount / this.expense.participants.length;
           this.expense.participants.forEach((participant) => {
             participant.share = equalShare;
           });
         }
+        console.log('Participant Shares:', this.expense.participants);
+
+        this.cdr.detectChanges();
       } catch (error) {
         console.error('Currency conversion failed:', error);
       }
@@ -262,5 +349,14 @@ export class ExpenseFormComponent {
     }
 
     this.updatePayerAmount();
+  }
+
+  // Add a watcher for amount changes
+  async onAmountChange(newAmount: number) {
+    this.expense.totalAmount = newAmount;
+    if (this.expense.currency) {
+      // Only convert if currency is selected
+      await this.updateAmountAndShares();
+    }
   }
 }
