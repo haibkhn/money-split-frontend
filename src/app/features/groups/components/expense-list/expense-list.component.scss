@@ -1,0 +1,182 @@
+.expense-list {
+  .list-header {
+    padding: 1rem;
+    
+    h3 {
+      font-size: 1.2rem;
+      color: #333;
+      margin: 0;
+    }
+  }
+
+  .expenses {
+    .expense-item {
+      background: white;
+      border: 1px solid #eee;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+
+      .expense-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid #eee;
+
+        .main-info {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          flex: 1;
+
+          .date {
+            color: #666;
+            font-size: 0.9rem;
+            min-width: 60px;
+          }
+
+          .description {
+            font-weight: 500;
+            color: #333;
+            flex: 1;
+          }
+
+          .amount {
+            font-weight: 600;
+            color: #2563eb;
+            font-size: 1.1rem;
+          }
+        }
+
+        .delete-button {
+          width: 28px;
+          height: 28px;
+          border: none;
+          background: none;
+          color: #999;
+          font-size: 1.2rem;
+          cursor: pointer;
+          border-radius: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-left: 0.5rem;
+          
+          &:hover {
+            background-color: #fee2e2;
+            color: #ef4444;
+          }
+        }
+      }
+
+      .expense-details {
+        font-size: 0.9rem;
+        color: #666;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+
+        .payers, .split-info {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+
+          .label {
+            color: #666;
+            min-width: 70px;
+          }
+
+          .payer {
+            color: #059669;
+
+            .amount {
+              color: inherit;
+              font-weight: 500;
+            }
+          }
+
+          .participants {
+            color: #333;
+          }
+
+          .split-type {
+            background: #f0f0f0;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            text-transform: capitalize;
+          }
+        }
+      }
+    }
+  }
+
+  .no-expenses {
+    text-align: center;
+    padding: 2rem;
+    color: #666;
+    background: white;
+    border-radius: 8px;
+    border: 2px dashed #eee;
+
+    p {
+      margin: 0;
+      font-style: italic;
+    }
+  }
+}
+
+// Responsive styles
+@media (max-width: 768px) {
+  .expense-list {
+    .expenses .expense-item {
+      .expense-header {
+        .main-info {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 0.5rem;
+
+          .description {
+            width: 100%;
+          }
+
+          .amount-container {
+            display: flex;
+            flex-direction: column;
+            // align-items: flex-end;
+            gap: 0.25rem;
+            width: 100%;
+            align-items: flex-start;
+
+            .amount {
+              font-weight: 600;
+              color: #2563eb;
+              font-size: 1.1rem;
+            }
+
+            .converted-amount {
+              font-size: 0.9rem;
+              color: #666;
+              font-weight: normal;
+              margin-left: 0.5rem;
+            }
+          }
+        }
+      }
+
+      .expense-details {
+        .payers, .split-info {
+          flex-direction: column;
+          align-items: flex-start;
+          
+          .label {
+            min-width: auto;
+          }
+        }
+      }
+    }
+  }
+}

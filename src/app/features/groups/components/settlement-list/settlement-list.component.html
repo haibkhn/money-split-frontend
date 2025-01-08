@@ -1,0 +1,22 @@
+<div class="settlement-list" *ngIf="group$ | async as group">
+  <div class="header">
+    <h3>Settlement Suggestions</h3>
+  </div>
+
+  <div class="settlements">
+    <ng-container *ngIf="settlements$ | async as settlements">
+      <div class="settlement-item" *ngFor="let settlement of settlements">
+        <div class="settlement-details">
+          <span class="from">{{ getMemberName(group, settlement.from) }}</span>
+          <span class="arrow">→</span>
+          <span class="to">{{ getMemberName(group, settlement.to) }}</span>
+          <span class="amount">{{ settlement.amount | currency }}</span>
+        </div>
+      </div>
+
+      <div class="no-settlements" *ngIf="settlements.length === 0">
+        All settled up! No payments needed.
+      </div>
+    </ng-container>
+  </div>
+</div>

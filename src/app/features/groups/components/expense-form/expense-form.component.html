@@ -1,0 +1,215 @@
+<div class="expense-form">
+  <button *ngIf="!showForm" class="add-button" (click)="showForm = true">
+    Add Expense
+  </button>
+
+  <div class="form-container" *ngIf="showForm && (group$ | async) as group">
+    <h3>New Expense</h3>
+    <form (ngSubmit)="addExpense()">
+      <!-- Basic Info -->
+      <div class="form-group">
+        <label for="description">Description</label>
+        <input
+          type="text"
+          id="description"
+          [(ngModel)]="expense.description"
+          name="description"
+          placeholder="Enter description"
+          required
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="totalAmount">Total Amount</label>
+        <input
+          type="text"
+          id="totalAmount"
+          [value]="displayAmount"
+          (input)="onAmountInput($event)"
+          (blur)="updatePayerAmount()"
+          name="totalAmount"
+          placeholder="0.00"
+          required
+        />
+      </div>
+
+      <div
+        class="form-group"
+        [class.has-conversion]="expense.currency !== (group$ | async)?.currency"
+      >
+        <label for="currency">Currency</label>
+        <select
+          id="currency"
+          [(ngModel)]="expense.currency"
+          (ngModelChange)="updateAmountAndShares()"
+          name="currency"
+          [disabled]="isLoading"
+        >
+          <option *ngFor="let currency of currencies" [value]="currency.code">
+            {{ currency.code }} - {{ currency.name }}
+          </option>
+        </select>
+        <div
+          class="currency-info"
+          *ngIf="
+            expense.convertedAmount &&
+            expense.currency !== (group$ | async)?.currency
+          "
+        >
+          ≈
+          {{ expense.convertedAmount | currency : (group$ | async)?.currency }}
+        </div>
+      </div>
+
+      <!-- Paid By Section -->
+      <div class="form-group">
+        <label>Paid By</label>
+        <div class="payer-type-toggle">
+          <button
+            type="button"
+            (click)="isMultiplePayers = false"
+            [class.active]="!isMultiplePayers"
+            title="Switch to Single Payer"
+          >
+            Single Payer
+          </button>
+          <button
+            type="button"
+            (click)="isMultiplePayers = true"
+            [class.active]="isMultiplePayers"
+            title="Switch to Multiple Payers"
+          >
+            Multiple Payers
+          </button>
+        </div>
+
+        <!-- Single Payer -->
+        <div *ngIf="!isMultiplePayers" class="single-payer">
+          <label for="singlePayer">Select who paid</label>
+          <select
+            id="singlePayer"
+            [(ngModel)]="expense.payers[0].memberId"
+            name="singlePayer"
+            aria-label="Select who paid"
+          >
+            <option value="">Select who paid</option>
+            <option *ngFor="let member of group.members" [value]="member.id">
+              {{ member.name }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Multiple Payers -->
+        <div *ngIf="isMultiplePayers" class="multiple-payers">
+          <div
+            *ngFor="let payer of expense.payers; let i = index"
+            class="payer-row"
+          >
+            <label for="payer{{ i }}">Select payer</label>
+            <select
+              id="payer{{ i }}"
+              [(ngModel)]="payer.memberId"
+              [name]="'payer' + i"
+              aria-label="Select payer"
+            >
+              <option value="">Select who paid</option>
+              <option *ngFor="let member of group.members" [value]="member.id">
+                {{ member.name }}
+              </option>
+            </select>
+            <input
+              type="number"
+              [(ngModel)]="payer.amount"
+              [name]="'amount' + i"
+              min="0"
+              step="0.01"
+              placeholder="Enter amount"
+              aria-label="Enter amount paid"
+            />
+            <button
+              type="button"
+              class="remove-button"
+              (click)="removePayer(i)"
+              title="Remove payer"
+            >
+              ×
+            </button>
+          </div>
+          <button
+            type="button"
+            class="add-payer-button"
+            (click)="addPayer()"
+            title="Add another payer"
+          >
+            Add Another Payer
+          </button>
+        </div>
+      </div>
+
+      <!-- Paid For Section -->
+      <div class="form-group">
+        <label>Paid For</label>
+        <div class="participant-type-toggle">
+          <button
+            type="button"
+            (click)="includeEveryone = true"
+            [class.active]="includeEveryone"
+            title="Include Everyone"
+          >
+            Everyone
+          </button>
+          <button
+            type="button"
+            (click)="includeEveryone = false"
+            [class.active]="!includeEveryone"
+            title="Select Specific People"
+          >
+            Select People
+          </button>
+        </div>
+
+        <div *ngIf="!includeEveryone" class="participant-selection">
+          <div
+            *ngFor="let member of group.members"
+            class="participant-checkbox"
+          >
+            <label>
+              <input
+                type="checkbox"
+                [checked]="isParticipantSelected(member.id)"
+                (change)="toggleParticipant(member.id)"
+              />
+              {{ member.name }}
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Date -->
+      <div class="form-group">
+        <label for="expenseDate">Date</label>
+        <input
+          type="date"
+          id="expenseDate"
+          [(ngModel)]="expense.date"
+          name="date"
+          required
+          aria-label="Enter the date of expense"
+        />
+      </div>
+
+      <!-- Buttons -->
+      <div class="button-group">
+        <button type="submit" title="Add the expense">Add Expense</button>
+        <button
+          type="button"
+          class="cancel"
+          (click)="resetForm()"
+          title="Cancel and reset the form"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

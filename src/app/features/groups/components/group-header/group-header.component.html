@@ -1,0 +1,35 @@
+<header class="group-header">
+  <div class="left">
+    <h1 *ngIf="!isEditing">{{ groupName }}</h1>
+    <input
+      *ngIf="isEditing"
+      type="text"
+      [(ngModel)]="groupName"
+      class="edit-input"
+      placeholder="Enter group name"
+    />
+    <button
+      class="edit-name"
+      [class.save-button]="isEditing"
+      (click)="toggleEditName()"
+    >
+      {{ isEditing ? "Save" : "Edit" }}
+    </button>
+  </div>
+
+  <div class="right">
+    <div class="currency-badge">{{ groupCurrency }}</div>
+    <button class="share-button" (click)="shareGroup()">Share Group</button>
+  </div>
+</header>
+
+<div class="group-stats">
+  <div class="stat-item">
+    <span class="label">Total Expenses</span>
+    <span class="value">{{ totalExpenses | currency : groupCurrency }}</span>
+  </div>
+  <div class="stat-item">
+    <span class="label">Members</span>
+    <span class="value">{{ memberCount }}</span>
+  </div>
+</div>

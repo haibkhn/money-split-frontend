@@ -1,0 +1,58 @@
+<div class="expense-list" *ngIf="group$ | async as group">
+  <div class="list-header">
+    <h3>Recent Expenses</h3>
+  </div>
+
+  <div class="expenses" *ngIf="group.expenses.length > 0">
+    <div class="expense-item" *ngFor="let expense of group.expenses">
+      <div class="expense-header">
+        <div class="main-info">
+          <span class="date">{{ expense.date | date : "MMM d" }}</span>
+          <span class="description">{{ expense.description }}</span>
+          <div class="amount-container">
+            <span class="amount">
+              {{ expense.totalAmount | currency : expense.currency }}
+            </span>
+            <span
+              class="converted-amount"
+              *ngIf="expense.currency !== group.currency"
+            >
+              ≈ {{ expense.convertedAmount | currency : group.currency }}
+            </span>
+          </div>
+        </div>
+        <button class="delete-button" (click)="removeExpense(expense.id)">
+          ×
+        </button>
+      </div>
+
+      <div class="expense-details">
+        <!-- Multiple payers -->
+        <div class="payers">
+          <span class="label">Paid by:</span>
+          <ng-container *ngFor="let payer of expense.payers; let last = last">
+            <span class="payer">
+              {{ getMemberName(group, payer.memberId) }}
+              ({{ payer.amount | currency : group.currency }}){{
+                !last ? "," : ""
+              }}
+            </span>
+          </ng-container>
+        </div>
+
+        <!-- Split info -->
+        <div class="split-info">
+          <span class="label">Split between:</span>
+          <span class="participants">
+            {{ getParticipantNames(group, expense.participants) }}
+          </span>
+          <span class="split-type">{{ expense.splitType }} split</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="no-expenses" *ngIf="group.expenses.length === 0">
+    <p>No expenses yet. Start by adding your first expense!</p>
+  </div>
+</div>
