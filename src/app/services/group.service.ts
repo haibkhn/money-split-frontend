@@ -106,7 +106,7 @@ export class GroupService {
     this.currentGroup$.pipe(take(1)).subscribe((group) => {
       if (!group) return;
 
-      console.log('Adding expense:', expense);
+      // console.log('Adding expense:', expense);
 
       const updatedMembers = group.members.map((member) => {
         // Calculate what they paid
@@ -131,7 +131,7 @@ export class GroupService {
         members: updatedMembers,
       };
 
-      console.log('Updated group after adding expense:', updatedGroup);
+      // console.log('Updated group after adding expense:', updatedGroup);
 
       this.saveGroup(updatedGroup);
 
@@ -222,7 +222,7 @@ export class GroupService {
       ...member,
       balance: 0,
     }));
-    console.log('Balances reset:', updatedMembers);
+    // console.log('Balances reset:', updatedMembers);
 
     // Recalculate all balances from expenses
     group.expenses.forEach((expense) => {
@@ -241,7 +241,7 @@ export class GroupService {
       });
     });
 
-    console.log('Balances after calculation:', updatedMembers);
+    // console.log('Balances after calculation:', updatedMembers);
 
     // Update the group with new balances
     const updatedGroup = {

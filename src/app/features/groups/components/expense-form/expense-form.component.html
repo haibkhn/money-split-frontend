@@ -28,7 +28,7 @@
             (ngModelChange)="updateAmountAndShares()"
           >
             <option *ngFor="let currency of currencies" [value]="currency.code">
-              {{ currency.code }}
+              {{ currency.code }} - {{ currency.name }}
             </option>
           </select>
           <input
@@ -38,7 +38,7 @@
             (input)="onAmountInput($event)"
             name="totalAmount"
             required
-            placeholder="0.00"
+            placeholder="0"
           />
         </div>
         <div

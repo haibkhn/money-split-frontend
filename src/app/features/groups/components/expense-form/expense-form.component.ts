@@ -65,9 +65,10 @@ export class ExpenseFormComponent {
 
   initializeGroup() {
     this.group$.subscribe((group) => {
-      console.log('Group loaded:', group);
-
       if (group) {
+        // Set the default currency to the group's currency
+        this.expense.currency = group.currency;
+
         if (this.includeEveryone) {
           this.expense.participants = group.members.map((member) => ({
             memberId: member.id,
@@ -128,7 +129,7 @@ export class ExpenseFormComponent {
       this.expense.participants.splice(index, 1);
     }
     this.updateParticipantShares();
-    console.log('Participants after toggle:', this.expense.participants);
+    // console.log('Participants after toggle:', this.expense.participants);
   }
 
   updateParticipantShares() {
@@ -285,20 +286,22 @@ export class ExpenseFormComponent {
 
   // Update reset form to include currency
   resetForm() {
-    this.expense = {
-      description: '',
-      totalAmount: 0,
-      currency: 'EUR',
-      convertedAmount: 0,
-      payers: [{ memberId: '', amount: 0 }],
-      participants: [],
-      date: new Date().toISOString().split('T')[0],
-      splitType: 'equal',
-    };
-    this.displayAmount = ''; // Reset display amount
-    this.showForm = false;
-    this.isMultiplePayers = false;
-    this.includeEveryone = true;
+    this.group$.pipe(take(1)).subscribe((group) => {
+      this.expense = {
+        description: '',
+        totalAmount: 0,
+        currency: group?.currency || 'EUR', // Use group's currency or fallback to 'EUR'
+        convertedAmount: 0,
+        payers: [{ memberId: '', amount: 0 }],
+        participants: [],
+        date: new Date().toISOString().split('T')[0],
+        splitType: 'equal',
+      };
+      this.displayAmount = '';
+      this.showForm = false;
+      this.isMultiplePayers = false;
+      this.includeEveryone = true;
+    });
   }
 
   isParticipantSelected(memberId: string): boolean {
@@ -329,13 +332,13 @@ export class ExpenseFormComponent {
 
         // The condition we're checking
         if (this.expense.payers.length > 0 && this.expense.payers[0].memberId) {
-          console.log('Updating payer amounts');
+          // console.log('Updating payer amounts');
           const equalAmount =
             this.expense.convertedAmount / this.expense.payers.length;
           this.expense.payers.forEach((payer) => {
             payer.amount = equalAmount;
           });
-          console.log('Payer Amounts updated:', this.expense.payers);
+          // console.log('Payer Amounts updated:', this.expense.payers);
         } else {
           console.log('Skipping payer amount update because:', {
             'has payers': this.expense.payers.length > 0,
@@ -357,7 +360,7 @@ export class ExpenseFormComponent {
             participant.share = equalShare;
           });
         }
-        console.log('Participant Shares:', this.expense.participants);
+        // console.log('Participant Shares:', this.expense.participants);
 
         this.cdr.detectChanges();
       } catch (error) {
