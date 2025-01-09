@@ -6,6 +6,8 @@ import { inject } from '@angular/core';
 import { GroupService } from '../../../../services/group.service';
 import { CurrencyService } from '../../../../services/currency.service';
 import { Currency } from '../../../../models/types';
+import { v4 as uuidv4 } from 'uuid';
+import { UrlService } from '../../../../services/url.service';
 
 @Component({
   selector: 'app-create-group',
@@ -18,6 +20,7 @@ export class CreateGroupComponent implements OnInit {
   private router = inject(Router);
   private groupService = inject(GroupService);
   private currencyService = inject(CurrencyService);
+  private urlService = inject(UrlService);
 
   groupName = '';
   selectedCurrency = 'EUR'; // Default currency
@@ -56,7 +59,8 @@ export class CreateGroupComponent implements OnInit {
       return;
     }
 
-    const groupId = Math.random().toString(36).substring(2, 8);
+    const groupId = uuidv4();
+    const shortId = this.urlService.encodeId(groupId);
     const newGroup = {
       id: groupId,
       name: this.groupName.trim(),
@@ -66,6 +70,6 @@ export class CreateGroupComponent implements OnInit {
     };
 
     this.groupService.createGroup(newGroup);
-    this.router.navigate(['/g', groupId]);
+    this.router.navigate(['/g', shortId]);
   }
 }
