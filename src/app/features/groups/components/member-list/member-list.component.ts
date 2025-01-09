@@ -8,6 +8,7 @@ import { FormsModule } from '@angular/forms';
 import { inject } from '@angular/core';
 import { GroupService } from '../../../../services/group.service';
 import { take } from 'rxjs/operators';
+import { DialogService } from '../../../../services/dialog.service';
 
 @Component({
   selector: 'app-member-list',
@@ -20,6 +21,7 @@ import { take } from 'rxjs/operators';
 export class MemberListComponent {
   private groupService = inject(GroupService);
   private cdr = inject(ChangeDetectorRef);
+  private dialogService = inject(DialogService);
 
   group$ = this.groupService.currentGroup$;
   showAddMember = false;
@@ -38,12 +40,19 @@ export class MemberListComponent {
     }
   }
 
-  removeMember(memberId: string) {
-    if (confirm('Are you sure you want to remove this member?')) {
+  async removeMember(memberId: string) {
+    const confirmed = await this.dialogService.confirm({
+      title: 'Remove Member',
+      message:
+        'Are you sure you want to remove this member? This action cannot be undone.',
+      confirmText: 'Remove',
+      cancelText: 'Cancel',
+    });
+
+    if (confirmed) {
       this.group$.pipe(take(1)).subscribe((group) => {
         if (group) {
           this.groupService.removeMember(group.id, memberId);
-          this.cdr.detectChanges();
         }
       });
     }

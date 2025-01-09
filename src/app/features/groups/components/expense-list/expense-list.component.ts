@@ -4,6 +4,7 @@ import { inject } from '@angular/core';
 import { GroupService } from '../../../../services/group.service';
 import { Group, Member } from '../../../../models/types';
 import { take } from 'rxjs/operators';
+import { DialogService } from '../../../../services/dialog.service';
 
 @Component({
   selector: 'app-expense-list',
@@ -15,6 +16,7 @@ import { take } from 'rxjs/operators';
 export class ExpenseListComponent {
   private groupService = inject(GroupService);
   group$ = this.groupService.currentGroup$;
+  private dialogService = inject(DialogService);
 
   getMemberName(group: Group, payer: any): string {
     if (!payer) {
@@ -73,8 +75,16 @@ export class ExpenseListComponent {
     return names.length > 0 ? names.join(', ') : 'Unknown participants';
   }
 
-  removeExpense(expenseId: string) {
-    if (confirm('Are you sure you want to delete this expense?')) {
+  async removeExpense(expenseId: string) {
+    const confirmed = await this.dialogService.confirm({
+      title: 'Remove Expense',
+      message:
+        'Are you sure you want to delete this expense? This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+    });
+
+    if (confirmed) {
       this.group$.pipe(take(1)).subscribe((group) => {
         if (!group) return;
         this.groupService.removeExpense(expenseId);
