@@ -127,14 +127,48 @@
       text-align: center;
     }
 
+    .add-button {
+      width: 100%;
+    }
+
     .add-member-form {
       .form-buttons {
-        justify-content: space-between; /* Align buttons to left and right in the row */
-        gap: 0.5rem;
-  
+        display: flex; /* Arrange buttons in a row */
+        justify-content: space-between; /* Align buttons across the row */
+        gap: 0.5rem; /* Add spacing between buttons */
+        width: 100%; /* Ensure the parent container spans the full width */
+    
         button {
-          flex: 1; /* Ensure buttons share space equally */
-          max-width: 45%; /* Limit button width for better alignment */
+          flex: 1; /* Allow buttons to take equal space */
+          padding: 0.5rem 1rem;
+          border: none;
+          border-radius: 4px;
+          font-size: 1rem;
+          cursor: pointer;
+          transition: background-color 0.2s;
+    
+          &.primary {
+            background-color: #4caf50;
+            color: white;
+    
+            &:hover {
+              background-color: #45a049;
+            }
+    
+            &:disabled {
+              background-color: #cccccc;
+              cursor: not-allowed;
+            }
+          }
+    
+          &.cancel {
+            background-color: #f0f0f0;
+            color: #666;
+    
+            &:hover {
+              background-color: #e0e0e0;
+            }
+          }
         }
       }
     }

@@ -122,10 +122,10 @@
 @media (max-width: 768px) {
   .group-header {
     display: flex;
-    flex-wrap: wrap; /* Allow wrapping if needed */
+    flex-wrap: wrap; /* Allow wrapping */
     align-items: center;
-    justify-content: space-between; /* Distribute items across the row */
-    gap: 0.5rem;
+    justify-content: space-between;
+    gap: 1rem;
     padding: 1rem;
 
     .left {
@@ -171,14 +171,36 @@
           background-color: #45a049;
         }
 
-        width: auto; /* Ensure share button is properly sized */
+        width: auto;
       }
     }
   }
 
   .group-stats {
     padding: 1rem;
-    justify-content: center;
+    display: flex;
+    flex-wrap: wrap; /* Allow wrapping for stats */
+    gap: 1rem;
+
+    .stat-item {
+      flex: 1 1 calc(50% - 1rem); /* Two items per row */
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+
+      .label {
+        font-size: 0.875rem;
+        color: #666;
+        text-align: center; /* Center align text */
+      }
+
+      .value {
+        font-size: 1.25rem;
+        font-weight: 500;
+        color: #333;
+        text-align: center; /* Center align text */
+      }
+    }
 
     &::-webkit-scrollbar {
       height: 4px;

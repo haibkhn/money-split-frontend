@@ -29,6 +29,7 @@ export class GroupHeaderComponent implements OnInit {
   totalExpenses: number = 0;
   memberCount: number = 0;
   groupCurrency: string = 'EUR';
+  memberSpending: { name: string; amountSpent: number }[] = [];
 
   private groupService = inject(GroupService);
   group$ = this.groupService.currentGroup$;
@@ -41,11 +42,30 @@ export class GroupHeaderComponent implements OnInit {
         this.groupName = group.name;
         this.memberCount = group.members.length;
         this.groupCurrency = group.currency;
+
+        // Calculate total expenses
         this.totalExpenses = group.expenses.reduce(
           (sum, expense) =>
             sum + (expense.convertedAmount || expense.totalAmount),
           0
         );
+
+        // Calculate each member's spending
+        this.memberSpending = group.members.map((member) => {
+          const amountSpent = group.expenses
+            .filter((expense) =>
+              expense.payers.some((payer) => payer.memberId === member.id)
+            )
+            .reduce((sum, expense) => {
+              const payer = expense.payers.find(
+                (payer) => payer.memberId === member.id
+              );
+              return sum + (payer?.amount || 0);
+            }, 0);
+
+          return { name: member.name, amountSpent };
+        });
+
         this.cdr.detectChanges();
       }
     });

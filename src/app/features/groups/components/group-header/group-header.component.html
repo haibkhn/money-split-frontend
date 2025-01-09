@@ -32,4 +32,10 @@
     <span class="label">Members</span>
     <span class="value">{{ memberCount }}</span>
   </div>
+  <div class="stat-item" *ngFor="let member of memberSpending">
+    <span class="label">{{ member.name }}</span>
+    <span class="value">
+      {{ member.amountSpent | currency : groupCurrency }}
+    </span>
+  </div>
 </div>
