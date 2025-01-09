@@ -103,7 +103,6 @@ export class ExpenseListComponent {
     }).format(amount);
   }
 
-  // Optional: Add this method if you want to show the exchange rate
   getExchangeRate(expense: any): string {
     if (expense.convertedAmount && expense.totalAmount) {
       const rate = expense.convertedAmount / expense.totalAmount;

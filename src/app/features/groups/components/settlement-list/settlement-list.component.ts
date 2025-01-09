@@ -26,9 +26,9 @@ export class SettlementListComponent {
 
   ngOnInit() {
     // Debug logging
-    this.settlements$.subscribe((settlements) => {
-      console.log('Settlements:', settlements);
-    });
+    // this.settlements$.subscribe((settlements) => {
+    //   console.log('Settlements:', settlements);
+    // });
   }
 
   getMemberName(group: Group, memberIdOrName: string): string {

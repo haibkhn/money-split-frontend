@@ -91,11 +91,11 @@ export class GroupHeaderComponent implements OnInit {
     });
 
     // Debug logging
-    console.log('Member spending calculation:', {
-      members: group.members,
-      expenses: group.expenses,
-      result: this.memberSpending,
-    });
+    // console.log('Member spending calculation:', {
+    //   members: group.members,
+    //   expenses: group.expenses,
+    //   result: this.memberSpending,
+    // });
   }
 
   toggleEditName() {

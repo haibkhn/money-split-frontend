@@ -179,44 +179,6 @@ export class GroupService {
     });
   }
 
-  // private calculateMemberBalances(
-  //   members: Member[],
-  //   expenses: Expense[]
-  // ): Member[] {
-  //   const updatedMembers = members.map((member) => ({
-  //     ...member,
-  //     balance: 0, // Start with 0 balance
-  //   }));
-
-  //   expenses.forEach((expense) => {
-  //     // Add amounts paid
-  //     expense.payers.forEach((payer) => {
-  //       const member = updatedMembers.find((m) => m.id === payer.memberId);
-  //       if (member) {
-  //         // Convert string to number and add
-  //         member.balance = Number(member.balance) + Number(payer.amount);
-  //       }
-  //     });
-
-  //     // Subtract shares
-  //     expense.participants.forEach((participant) => {
-  //       const member = updatedMembers.find(
-  //         (m) => m.id === participant.memberId
-  //       );
-  //       if (member) {
-  //         // Convert string to number and subtract
-  //         member.balance = Number(member.balance) - Number(participant.share);
-  //       }
-  //     });
-  //   });
-
-  //   // Round all balances to 2 decimal places before returning
-  //   return updatedMembers.map((member) => ({
-  //     ...member,
-  //     balance: Number(Number(member.balance).toFixed(2)),
-  //   }));
-  // }
-
   getSettlementSuggestions(group: Group) {
     if (!group || !group.members) return [];
 

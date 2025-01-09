@@ -269,7 +269,6 @@ export class ExpenseFormComponent {
           this.expense.convertedAmount = this.expense.totalAmount;
         }
 
-        // The condition we're checking
         if (this.expense.payers.length > 0 && this.expense.payers[0].memberId) {
           // console.log('Updating payer amounts');
           const equalAmount =
@@ -412,7 +411,6 @@ export class ExpenseFormComponent {
     } paid`;
   }
 
-  // Add this to your component
   isPaymentTotalValid(): boolean {
     const totalPaid = this.getTotalPaid();
     return Math.abs(totalPaid - this.expense.totalAmount) < 0.01;
