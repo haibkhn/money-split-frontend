@@ -60,7 +60,20 @@ export class MemberListComponent {
     this.cdr.detectChanges();
   }
 
-  getBalanceClass(balance: number): string {
-    return balance > 0 ? 'positive' : balance < 0 ? 'negative' : '';
+  getBalanceClass(balance: number | null): string {
+    if (balance === null || balance === undefined) return '';
+    // Convert to number and round to 2 decimal places
+    const roundedBalance = Number(Number(balance).toFixed(2));
+    return roundedBalance > 0
+      ? 'positive'
+      : roundedBalance < 0
+      ? 'negative'
+      : '';
+  }
+
+  formatBalance(amount: number | null): number {
+    if (amount === null || amount === undefined) return 0;
+    // Convert to number and round to 2 decimal places
+    return Number(Number(amount).toFixed(2));
   }
 }

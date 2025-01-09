@@ -1,10 +1,11 @@
 import { inject, Injectable, PLATFORM_ID } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Group, Member, Expense } from '../models/types';
-import { BehaviorSubject, take, catchError, EMPTY } from 'rxjs';
+import { Group, Member, Expense, CreateExpenseDto } from '../models/types';
+import { BehaviorSubject, take, catchError, EMPTY, finalize } from 'rxjs';
 import { NotificationService } from './notification.service';
 import { environment } from '../../environment/environment';
 import { isPlatformBrowser } from '@angular/common';
+import { UrlService } from './url.service';
 
 @Injectable({
   providedIn: 'root',
@@ -13,6 +14,7 @@ export class GroupService {
   private apiUrl = environment.apiUrl;
   private currentGroup = new BehaviorSubject<Group | null>(null);
   currentGroup$ = this.currentGroup.asObservable();
+  private isLoading = false;
   private settlements = new BehaviorSubject<
     Array<{ from: string; to: string; amount: number }>
   >([]);
@@ -21,6 +23,7 @@ export class GroupService {
   private platformId = inject(PLATFORM_ID);
   private http = inject(HttpClient);
   private notificationService = inject(NotificationService);
+  private urlService = inject(UrlService);
 
   // Create group now makes an HTTP POST request
   createGroup(group: Group) {
@@ -51,36 +54,26 @@ export class GroupService {
 
   // Load group now fetches from the backend
   loadGroup(groupId: string) {
+    const encodedId = this.urlService.encodeId(groupId);
+
     this.http
-      .get<Group>(`${this.apiUrl}/groups/${groupId}`)
+      .get<Group>(`${this.apiUrl}/groups/${encodedId}`)
       .pipe(
         catchError((error) => {
           console.error('Error loading group:', error);
-          if (isPlatformBrowser(this.platformId)) {
-            this.notificationService.show('Failed to load group', 'error');
-          }
+          this.notificationService.show('Failed to load group', 'error');
           return EMPTY;
         })
       )
       .subscribe((group) => {
         if (group) {
-          // Ensure members and expenses arrays exist
           group.members = group.members || [];
           group.expenses = group.expenses || [];
-
           this.currentGroup.next(group);
+
+          // Calculate settlements whenever group is loaded
           const newSettlements = this.getSettlementSuggestions(group);
           this.settlements.next(newSettlements);
-
-          if (isPlatformBrowser(this.platformId)) {
-            this.notificationService.show('Group loaded successfully');
-          }
-        } else {
-          this.currentGroup.next(null);
-          this.settlements.next([]);
-          if (isPlatformBrowser(this.platformId)) {
-            this.notificationService.show('Group not found', 'error');
-          }
         }
       });
   }
@@ -131,33 +124,16 @@ export class GroupService {
       });
   }
 
-  addExpense(groupId: string, expense: Expense) {
+  addExpense(groupId: string, expense: CreateExpenseDto) {
     return this.http
-      .post<Expense>(`${this.apiUrl}/expenses`, { ...expense, groupId })
+      .post<Expense>(`${this.apiUrl}/expenses`, expense)
       .subscribe({
-        next: (newExpense) => {
-          this.currentGroup$.pipe(take(1)).subscribe((group) => {
-            if (!group) return;
-
-            // Update members' balances with new expense
-            const updatedMembers = this.calculateMemberBalances(group.members, [
-              newExpense,
-            ]);
-
-            const updatedGroup = {
-              ...group,
-              expenses: [...group.expenses, newExpense],
-              members: updatedMembers,
-            };
-
-            this.currentGroup.next(updatedGroup);
-            const newSettlements = this.getSettlementSuggestions(updatedGroup);
-            this.settlements.next(newSettlements);
-          });
+        next: () => {
+          this.loadGroup(groupId); // Reload group after adding expense
         },
         error: (error) => {
-          this.notificationService.show('Failed to add expense', 'error');
           console.error('Error adding expense:', error);
+          this.notificationService.show('Failed to add expense', 'error');
         },
       });
   }
@@ -193,89 +169,100 @@ export class GroupService {
       next: () => {
         this.currentGroup$.pipe(take(1)).subscribe((group) => {
           if (!group) return;
-
-          const updatedExpenses = group.expenses.filter(
-            (e) => e.id !== expenseId
-          );
-          const updatedMembers = this.calculateMemberBalances(
-            group.members.map((m) => ({ ...m, balance: 0 })),
-            updatedExpenses
-          );
-
-          const updatedGroup = {
-            ...group,
-            expenses: updatedExpenses,
-            members: updatedMembers,
-          };
-
-          this.currentGroup.next(updatedGroup);
-          const newSettlements = this.getSettlementSuggestions(updatedGroup);
-          this.settlements.next(newSettlements);
+          this.loadGroup(group.id); // Reload entire group after removing expense
         });
       },
       error: (error) => {
-        this.notificationService.show('Failed to remove expense', 'error');
         console.error('Error removing expense:', error);
+        this.notificationService.show('Failed to remove expense', 'error');
       },
     });
   }
 
-  private calculateMemberBalances(
-    members: Member[],
-    expenses: Expense[]
-  ): Member[] {
-    const updatedMembers = members.map((m) => ({ ...m, balance: 0 }));
+  // private calculateMemberBalances(
+  //   members: Member[],
+  //   expenses: Expense[]
+  // ): Member[] {
+  //   const updatedMembers = members.map((member) => ({
+  //     ...member,
+  //     balance: 0, // Start with 0 balance
+  //   }));
 
-    expenses.forEach((expense) => {
-      updatedMembers.forEach((member) => {
-        const amountPaid = expense.payers
-          .filter((payer) => payer.memberId === member.id)
-          .reduce((sum, payer) => sum + payer.amount, 0);
+  //   expenses.forEach((expense) => {
+  //     // Add amounts paid
+  //     expense.payers.forEach((payer) => {
+  //       const member = updatedMembers.find((m) => m.id === payer.memberId);
+  //       if (member) {
+  //         // Convert string to number and add
+  //         member.balance = Number(member.balance) + Number(payer.amount);
+  //       }
+  //     });
 
-        const share =
-          expense.participants.find((p) => p.memberId === member.id)?.share ||
-          0;
+  //     // Subtract shares
+  //     expense.participants.forEach((participant) => {
+  //       const member = updatedMembers.find(
+  //         (m) => m.id === participant.memberId
+  //       );
+  //       if (member) {
+  //         // Convert string to number and subtract
+  //         member.balance = Number(member.balance) - Number(participant.share);
+  //       }
+  //     });
+  //   });
 
-        member.balance += amountPaid - share;
-      });
-    });
+  //   // Round all balances to 2 decimal places before returning
+  //   return updatedMembers.map((member) => ({
+  //     ...member,
+  //     balance: Number(Number(member.balance).toFixed(2)),
+  //   }));
+  // }
 
-    return updatedMembers;
-  }
+  getSettlementSuggestions(group: Group) {
+    if (!group || !group.members) return [];
 
-  // Add a method to get settlement suggestions
-  getSettlementSuggestions(
-    group: Group
-  ): Array<{ from: string; to: string; amount: number }> {
-    const membersCopy = group.members.map((m) => ({ ...m }));
-    const settlements: Array<{ from: string; to: string; amount: number }> = [];
-
-    const debtors = membersCopy
-      .filter((m) => m.balance < 0)
+    // Make a copy of members to avoid modifying the original
+    const members = group.members
+      .map((m) => ({
+        ...m,
+        balance: Number(m.balance || 0),
+      }))
       .sort((a, b) => a.balance - b.balance);
 
-    const creditors = membersCopy
-      .filter((m) => m.balance > 0)
-      .sort((a, b) => b.balance - a.balance);
+    const settlements: Array<{ from: string; to: string; amount: number }> = [];
 
-    while (debtors.length > 0 && creditors.length > 0) {
-      const debtor = debtors[0];
-      const creditor = creditors[0];
-      const amount = Math.min(Math.abs(debtor.balance), creditor.balance);
+    let i = 0;
+    let j = members.length - 1;
 
-      if (amount > 0.01) {
-        settlements.push({
-          from: debtor.id,
-          to: creditor.id,
-          amount: Math.round(amount * 100) / 100,
-        });
+    while (i < j) {
+      const debtor = members[i];
+      const creditor = members[j];
+
+      // Skip members with zero balance
+      if (Math.abs(debtor.balance) < 0.01) {
+        i++;
+        continue;
       }
 
-      debtor.balance += amount;
-      creditor.balance -= amount;
+      if (Math.abs(creditor.balance) < 0.01) {
+        j--;
+        continue;
+      }
 
-      if (Math.abs(debtor.balance) < 0.01) debtors.shift();
-      if (Math.abs(creditor.balance) < 0.01) creditors.shift();
+      const amount = Math.min(Math.abs(debtor.balance), creditor.balance);
+
+      if (amount > 0) {
+        settlements.push({
+          from: debtor.name,
+          to: creditor.name,
+          amount: Number(amount.toFixed(2)),
+        });
+
+        debtor.balance += amount;
+        creditor.balance -= amount;
+      }
+
+      if (Math.abs(debtor.balance) < 0.01) i++;
+      if (Math.abs(creditor.balance) < 0.01) j--;
     }
 
     return settlements;

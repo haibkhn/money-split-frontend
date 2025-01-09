@@ -16,21 +16,61 @@ export class ExpenseListComponent {
   private groupService = inject(GroupService);
   group$ = this.groupService.currentGroup$;
 
-  getMemberName(group: Group, memberId: string): string {
-    return group.members.find((m) => m.id === memberId)?.name || 'Unknown';
+  getMemberName(group: Group, payer: any): string {
+    if (!payer) {
+      console.warn('No payer provided');
+      return 'Unknown';
+    }
+
+    // Check if we have a memberId directly or nested in member object
+    const memberId = payer.memberId || (payer.member && payer.member.id);
+
+    if (!memberId) {
+      console.warn('No memberId found in payer', payer);
+      return 'Unknown';
+    }
+
+    if (!group || !group.members) {
+      console.warn('No group or members available');
+      return 'Unknown';
+    }
+
+    const member = group.members.find((m) => m.id === memberId);
+    if (!member) {
+      console.warn(`Member not found for ID: ${memberId}`, {
+        memberId,
+        availableMembers: group.members.map((m) => ({
+          id: m.id,
+          name: m.name,
+        })),
+      });
+      return 'Unknown';
+    }
+
+    return member.name;
   }
 
-  getParticipantNames(
-    group: Group,
-    participants: Array<{ memberId: string }>
-  ): string {
+  getParticipantNames(group: Group, participants: any[]): string {
+    if (!participants || participants.length === 0) {
+      return 'No participants';
+    }
+
+    if (!group || !group.members) {
+      return 'Unknown';
+    }
+
     if (participants.length === group.members.length) {
       return 'Everyone';
     }
 
-    return participants
-      .map((p) => this.getMemberName(group, p.memberId))
-      .join(', ');
+    const names = participants
+      .map((p) => {
+        const memberId = p.memberId || (p.member && p.member.id);
+        return this.getMemberName(group, { memberId });
+      })
+      .filter((name) => name !== 'Unknown');
+
+    return names.length > 0 ? names.join(', ') : 'Unknown participants';
   }
 
   removeExpense(expenseId: string) {

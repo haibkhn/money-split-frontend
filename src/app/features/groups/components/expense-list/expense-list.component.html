@@ -32,7 +32,7 @@
           <span class="label">Paid by:</span>
           <ng-container *ngFor="let payer of expense.payers; let last = last">
             <span class="payer">
-              {{ getMemberName(group, payer.memberId) }}
+              {{ getMemberName(group, payer) }}
               ({{ payer.amount | currency : group.currency }}){{
                 !last ? "," : ""
               }}

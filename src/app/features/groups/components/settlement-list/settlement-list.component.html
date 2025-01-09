@@ -11,7 +11,7 @@
           <span class="arrow">→</span>
           <span class="to">{{ getMemberName(group, settlement.to) }}</span>
           <span class="amount">{{
-            settlement.amount | currency : group.currency
+            formatAmount(settlement.amount, group.currency)
           }}</span>
         </div>
       </div>

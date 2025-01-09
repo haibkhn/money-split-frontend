@@ -8,26 +8,38 @@ export class UrlService {
     '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 
   encodeId(uuid: string): string {
-    console.log('Encoding UUID:', uuid);
-    // Remove hyphens and convert to decimal
-    const hex = uuid.replace(/-/g, '');
-    const decimal = BigInt(`0x${hex}`);
-    const encoded = this.toBase62(decimal);
-    console.log('Encoded ID:', encoded);
-    return encoded;
+    // If the input doesn't look like a UUID, assume it's already encoded
+    if (!uuid.includes('-')) {
+      return uuid;
+    }
+
+    try {
+      const hex = uuid.replace(/-/g, '');
+      const decimal = BigInt(`0x${hex}`);
+      return this.toBase62(decimal);
+    } catch (error) {
+      console.error('Error encoding ID:', error);
+      return uuid; // Return original if encoding fails
+    }
   }
 
   decodeId(shortId: string): string {
-    console.log('Decoding shortId:', shortId);
-    // Convert from base62 to UUID format
-    const decimal = this.fromBase62(shortId);
-    const hex = decimal.toString(16).padStart(32, '0');
-    const uuid = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(
-      12,
-      16
-    )}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-    console.log('Decoded UUID:', uuid);
-    return uuid;
+    // If it looks like a UUID already, return as is
+    if (shortId.includes('-')) {
+      return shortId;
+    }
+
+    try {
+      const decimal = this.fromBase62(shortId);
+      const hex = decimal.toString(16).padStart(32, '0');
+      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(
+        12,
+        16
+      )}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    } catch (error) {
+      console.error('Error decoding ID:', error);
+      return shortId; // Return original if decoding fails
+    }
   }
 
   private toBase62(decimal: bigint): string {
@@ -47,8 +59,7 @@ export class UrlService {
       const char = str[i];
       const value = this.base62Chars.indexOf(char);
       if (value === -1) {
-        console.error('Invalid character in shortId:', char);
-        return BigInt(0);
+        throw new Error('Invalid base62 character: ' + char);
       }
       result = result * BigInt(62) + BigInt(value);
     }
