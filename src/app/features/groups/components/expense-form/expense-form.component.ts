@@ -168,6 +168,30 @@ export class ExpenseFormComponent {
   }
 
   async addExpense() {
+    if (!this.expense.description || this.expense.totalAmount <= 0) {
+      this.notificationService.show(
+        'Please enter a valid description and total amount'
+      );
+      return;
+    }
+
+    // Validate multiple payers total matches
+    if (this.isMultiplePayers) {
+      const totalPaid = this.getTotalPaid();
+      // Check if totals match (allowing for small floating point differences)
+      if (Math.abs(totalPaid - this.expense.totalAmount) > 0.01) {
+        this.notificationService.show(
+          `Total amount (${this.formatNumber(this.expense.totalAmount)} ${
+            this.expense.currency
+          }) ` +
+            `doesn't match sum of individual payments (${this.formatNumber(
+              totalPaid
+            )} ${this.expense.currency})`
+        );
+        return;
+      }
+    }
+
     this.group$.pipe(take(1)).subscribe(async (group) => {
       if (!group) return;
 

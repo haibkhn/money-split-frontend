@@ -26,6 +26,7 @@
             [(ngModel)]="expense.currency"
             name="currency"
             (ngModelChange)="updateAmountAndShares()"
+            title="Currency"
           >
             <option *ngFor="let currency of currencies" [value]="currency.code">
               {{ currency.code }} - {{ currency.name }}
