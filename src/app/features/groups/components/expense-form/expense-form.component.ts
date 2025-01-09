@@ -6,6 +6,7 @@ import { GroupService } from '../../../../services/group.service';
 import { take } from 'rxjs';
 import { Currency } from '../../../../models/types';
 import { CurrencyService } from '../../../../services/currency.service';
+import { NotificationService } from '../../../../services/notification.service';
 
 @Component({
   selector: 'app-expense-form',
@@ -20,6 +21,7 @@ export class ExpenseFormComponent {
   private currencyService = inject(CurrencyService);
   private ngZone = inject(NgZone);
   private cdr = inject(ChangeDetectorRef);
+  private notificationService = inject(NotificationService);
 
   group$ = this.groupService.currentGroup$;
   currencies: Currency[] = [];
@@ -164,7 +166,9 @@ export class ExpenseFormComponent {
 
   async addExpense() {
     if (!this.expense.description || this.expense.totalAmount <= 0) {
-      alert('Please enter a valid description and total amount.');
+      this.notificationService.show(
+        'Please enter a valid description and total amount.'
+      );
       return;
     }
 
@@ -177,7 +181,7 @@ export class ExpenseFormComponent {
 
       // Check if totals match (allowing for small floating point differences)
       if (Math.abs(totalFromPayers - this.expense.totalAmount) > 0.01) {
-        alert(
+        this.notificationService.show(
           `Total amount (${this.formatNumber(
             this.expense.totalAmount
           )}) doesn't match sum of individual payments (${this.formatNumber(
@@ -192,29 +196,23 @@ export class ExpenseFormComponent {
       if (!group) return;
 
       try {
-        // Create the new expense
+        // Create base expense
         const newExpense = {
           id: Date.now().toString(),
           description: this.expense.description,
           totalAmount: this.expense.totalAmount,
           currency: this.expense.currency,
-          convertedAmount: this.expense.convertedAmount,
-          payers: [...this.expense.payers], // Create a copy
-          participants: [...this.expense.participants], // Create a copy
+          convertedAmount: 0,
+          payers: [...this.expense.payers],
+          participants: [...this.expense.participants],
           date: this.expense.date,
           splitType: this.expense.splitType,
         };
 
-        // Log the expense state before conversion
-        console.log('Expense before conversion:', {
-          totalAmount: newExpense.totalAmount,
-          payers: newExpense.payers,
-          participants: newExpense.participants,
-        });
-
-        // Convert currency if needed
+        // Handle currency conversion
         if (newExpense.currency !== group.currency) {
-          const converted = await this.currencyService
+          // Convert total amount
+          const convertedTotal = await this.currencyService
             .convertCurrency(
               newExpense.totalAmount,
               newExpense.currency,
@@ -222,12 +220,34 @@ export class ExpenseFormComponent {
             )
             .toPromise();
 
-          newExpense.convertedAmount = converted ?? newExpense.totalAmount;
+          newExpense.convertedAmount = convertedTotal ?? newExpense.totalAmount;
+
+          // Convert individual payer amounts
+          if (this.isMultiplePayers) {
+            // Create new array for converted payer amounts
+            const convertedPayers = await Promise.all(
+              newExpense.payers.map(async (payer) => {
+                const convertedAmount = await this.currencyService
+                  .convertCurrency(
+                    payer.amount,
+                    newExpense.currency,
+                    group.currency
+                  )
+                  .toPromise();
+
+                return {
+                  ...payer,
+                  amount: convertedAmount ?? payer.amount,
+                };
+              })
+            );
+            newExpense.payers = convertedPayers;
+          }
         } else {
           newExpense.convertedAmount = newExpense.totalAmount;
         }
 
-        // Update shares based on converted amount
+        // Update participant shares based on converted amount
         if (this.includeEveryone) {
           const perPersonShare =
             newExpense.convertedAmount / group.members.length;
@@ -235,19 +255,17 @@ export class ExpenseFormComponent {
             memberId: member.id,
             share: perPersonShare,
           }));
+        } else {
+          // Update custom participant shares based on converted amount
+          const shareRatio =
+            newExpense.convertedAmount / newExpense.totalAmount;
+          newExpense.participants = newExpense.participants.map(
+            (participant) => ({
+              ...participant,
+              share: participant.share * shareRatio,
+            })
+          );
         }
-
-        // Update payer amounts for single payer
-        if (!this.isMultiplePayers) {
-          newExpense.payers = [
-            {
-              memberId: newExpense.payers[0].memberId,
-              amount: newExpense.convertedAmount,
-            },
-          ];
-        }
-
-        console.log('Final expense state:', newExpense);
 
         // Add the expense
         this.groupService.addExpense(group.id, newExpense);
@@ -258,7 +276,9 @@ export class ExpenseFormComponent {
         });
       } catch (error) {
         console.error('Error adding expense:', error);
-        alert('Failed to add expense. Please try again.');
+        this.notificationService.show(
+          'Failed to add expense. Please try again.'
+        );
       }
     });
   }
@@ -394,7 +414,7 @@ export class ExpenseFormComponent {
     const formattedValue = this.formatNumberInput(value);
     input.value = formattedValue;
 
-    // Update payer amount
+    // Update payer amount in original currency
     const payer = this.expense.payers.find((p) => p.memberId === memberId);
     if (payer) {
       payer.amount = parseFloat(value.replace(/,/g, '')) || 0;

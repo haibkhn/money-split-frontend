@@ -1,6 +1,7 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { Group, Member, Expense } from '../models/types';
 import { BehaviorSubject, take } from 'rxjs';
+import { NotificationService } from './notification.service';
 
 @Injectable({
   providedIn: 'root',
@@ -8,6 +9,8 @@ import { BehaviorSubject, take } from 'rxjs';
 export class GroupService {
   private currentGroup = new BehaviorSubject<Group | null>(null);
   currentGroup$ = this.currentGroup.asObservable();
+
+  private notificationService = inject(NotificationService);
 
   // Add a separate BehaviorSubject for settlements
   private settlements = new BehaviorSubject<
@@ -28,7 +31,12 @@ export class GroupService {
 
       if (savedGroup) {
         // If group exists in localStorage, load it
-        this.currentGroup.next(JSON.parse(savedGroup));
+        const group = JSON.parse(savedGroup);
+        this.currentGroup.next(group);
+
+        // Recalculate settlements when loading group
+        const newSettlements = this.getSettlementSuggestions(group);
+        this.settlements.next(newSettlements);
       } else {
         // If no group exists, create new one
         const newGroup: Group = {
@@ -40,6 +48,7 @@ export class GroupService {
         };
 
         this.currentGroup.next(newGroup);
+        this.settlements.next([]); // Clear settlements for new group
         // Save the new group to localStorage
         localStorage.setItem(`group_${groupId}`, JSON.stringify(newGroup));
       }
@@ -54,6 +63,7 @@ export class GroupService {
       };
 
       this.currentGroup.next(newGroup);
+      this.settlements.next([]); // Clear settlements
     }
   }
 
@@ -146,7 +156,10 @@ export class GroupService {
       );
 
       if (hasExpensesAsPayer || hasExpensesAsParticipant) {
-        alert('Cannot remove member who is involved in existing expenses.');
+        this.notificationService.show(
+          'Cannot remove member who is involved in existing expenses.',
+          'error'
+        );
         return;
       }
 

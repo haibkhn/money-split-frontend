@@ -11,6 +11,7 @@ import { FormsModule } from '@angular/forms';
 import { GroupService } from '../../../../services/group.service';
 import { Group } from '../../../../models/types';
 import { take } from 'rxjs/operators';
+import { NotificationService } from '../../../../services/notification.service';
 
 @Component({
   selector: 'app-group-header',
@@ -32,6 +33,7 @@ export class GroupHeaderComponent implements OnInit {
   private groupService = inject(GroupService);
   group$ = this.groupService.currentGroup$;
   private cdr = inject(ChangeDetectorRef);
+  private notificationService = inject(NotificationService);
 
   ngOnInit() {
     this.group$.subscribe((group: Group | null) => {
@@ -64,7 +66,7 @@ export class GroupHeaderComponent implements OnInit {
   shareGroup() {
     const url = window.location.href;
     navigator.clipboard.writeText(url).then(() => {
-      alert('Group link copied to clipboard!');
+      this.notificationService.show('Group link copied to clipboard!');
     });
   }
 }
