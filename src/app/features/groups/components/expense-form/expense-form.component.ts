@@ -324,15 +324,17 @@ export class ExpenseFormComponent {
   onAmountInput(event: Event) {
     const input = event.target as HTMLInputElement;
 
-    // Remove any non-numeric characters except decimal point
-    const rawValue = input.value.replace(/[^\d.]/g, '');
+    // Allow only numbers and a single decimal point
+    const rawValue = input.value
+      .replace(/[^0-9.]/g, '')
+      .replace(/(\..*?)\..*/g, '$1');
 
     // Parse the value as a float for calculations
-    const numericValue = parseFloat(rawValue) || 0;
-    this.expense.totalAmount = numericValue;
+    const numericValue = parseFloat(rawValue) || null;
+    this.expense.totalAmount = numericValue ?? 0;
 
-    // Format the value with commas for display
-    input.value = this.formatNumber(numericValue);
+    // Update the input value to reflect the properly formatted number
+    input.value = rawValue;
 
     // Trigger conversion update
     this.updateAmountAndShares();
@@ -349,17 +351,23 @@ export class ExpenseFormComponent {
 
   onPayerAmountInput(event: Event, memberId: string) {
     const input = event.target as HTMLInputElement;
-    let value = input.value;
 
-    // Format the display value
-    const formattedValue = this.formatNumberInput(value);
-    input.value = formattedValue;
+    // Allow only numbers and a single decimal point
+    const rawValue = input.value
+      .replace(/[^0-9.]/g, '')
+      .replace(/(\..*?)\..*/g, '$1');
 
-    // Update payer amount in original currency
+    // Parse the value as a float
+    const numericValue = parseFloat(rawValue) || null;
+
+    // Update the payer's amount in the model
     const payer = this.expense.payers.find((p) => p.memberId === memberId);
     if (payer) {
-      payer.amount = parseFloat(value.replace(/,/g, '')) || 0;
+      payer.amount = numericValue ?? 0;
     }
+
+    // Update the input value to reflect the properly formatted number
+    input.value = rawValue;
   }
 
   getTotalPaid(): number {

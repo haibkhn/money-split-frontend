@@ -35,11 +35,13 @@
           <input
             type="text"
             id="totalAmount"
-            [value]="formatNumber(expense.totalAmount)"
+            [value]="
+              expense.totalAmount > 0 ? formatNumber(expense.totalAmount) : ''
+            "
             (input)="onAmountInput($event)"
             name="totalAmount"
             required
-            placeholder="0"
+            placeholder="Enter amount"
           />
         </div>
         <div
@@ -119,10 +121,14 @@
               <div class="amount-input-container">
                 <input
                   type="text"
-                  [ngModel]="getMemberPayment(member.id).amount || ''"
+                  [value]="
+                    getMemberPayment(member.id).amount > 0
+                      ? formatNumber(getMemberPayment(member.id).amount)
+                      : ''
+                  "
                   (input)="onPayerAmountInput($event, member.id)"
                   [name]="'amount_' + member.id"
-                  placeholder="0"
+                  placeholder="Enter amount"
                 />
                 <span class="currency-label">{{ expense.currency }}</span>
               </div>
