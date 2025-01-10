@@ -44,6 +44,18 @@ export class ExpenseFormComponent {
   isMultiplePayers = false;
   includeEveryone = true;
 
+  constructor() {
+    // Subscribe to group changes to dynamically handle new members
+    this.group$.subscribe((group) => {
+      if (group && this.includeEveryone) {
+        this.expense.participants = group.members.map((member) => ({
+          memberId: member.id,
+          share: this.expense.totalAmount / group.members.length,
+        }));
+      }
+    });
+  }
+
   ngOnInit() {
     this.loadCurrencies();
     this.initializeGroup();
@@ -87,38 +99,6 @@ export class ExpenseFormComponent {
     });
   }
 
-  constructor() {
-    // Subscribe to group changes to dynamically handle new members
-    this.group$.subscribe((group) => {
-      if (group && this.includeEveryone) {
-        this.expense.participants = group.members.map((member) => ({
-          memberId: member.id,
-          share: this.expense.totalAmount / group.members.length,
-        }));
-      }
-    });
-  }
-
-  addPayer() {
-    this.expense.payers.push({ memberId: '', amount: 0 });
-  }
-
-  removePayer(index: number) {
-    this.expense.payers.splice(index, 1);
-  }
-
-  updatePayerAmount() {
-    const amount = this.parseNumber(this.displayAmount);
-    this.expense.totalAmount = amount;
-
-    if (this.expense.payers.length > 0) {
-      const equalAmount = amount / this.expense.payers.length;
-      this.expense.payers.forEach((payer) => {
-        payer.amount = equalAmount;
-      });
-    }
-  }
-
   toggleParticipant(memberId: string) {
     const index = this.expense.participants.findIndex(
       (p) => p.memberId === memberId
@@ -143,26 +123,6 @@ export class ExpenseFormComponent {
 
       this.expense.participants.forEach((participant) => {
         participant.share = Number(perPersonShare.toFixed(2)); // Round to 2 decimal places
-      });
-    }
-  }
-
-  toggleIncludeEveryone() {
-    if (!this.includeEveryone && this.expense.participants.length > 0) {
-      const confirmReset = window.confirm(
-        'Switching to "Include Everyone" will reset your participant selections. Proceed?'
-      );
-      if (!confirmReset) {
-        return;
-      }
-    }
-    this.includeEveryone = !this.includeEveryone;
-    if (this.includeEveryone) {
-      this.group$.pipe(take(1)).subscribe((group) => {
-        this.expense.participants = group!.members.map((member) => ({
-          memberId: member.id,
-          share: this.expense.totalAmount / group!.members.length,
-        }));
       });
     }
   }
@@ -407,37 +367,5 @@ export class ExpenseFormComponent {
       // Reset to single payer
       this.expense.payers = [{ memberId: '', amount: 0 }];
     }
-  }
-
-  // For payment progress display
-  getProgressText(): string {
-    const totalPaid = this.getTotalPaid();
-    const total = this.expense.totalAmount;
-
-    return `${this.formatNumber(totalPaid)} of ${this.formatNumber(total)} ${
-      this.expense.currency
-    } paid`;
-  }
-
-  isPaymentTotalValid(): boolean {
-    const totalPaid = this.getTotalPaid();
-    return Math.abs(totalPaid - this.expense.totalAmount) < 0.01;
-  }
-
-  formatNumberInput(value: string): string {
-    // Remove existing commas and non-numeric characters except decimal
-    value = value.replace(/,/g, '').replace(/[^\d.]/g, '');
-
-    // If empty or just decimal point, return empty
-    if (!value || value === '.') return '';
-
-    // Split number into integer and decimal parts
-    let [integer, decimal] = value.split('.');
-
-    // Add commas to integer part
-    integer = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-
-    // Return with decimal if exists
-    return decimal ? `${integer}.${decimal}` : integer;
   }
 }
