@@ -96,19 +96,21 @@ export class ExpenseListComponent {
     return expense.currency && expense.currency !== groupCurrency;
   }
 
-  formatAmount(amount: number, currency: string): string {
+  formatAmount(amount: number | null | undefined, currency: string): string {
+    if (amount == null) return 'N/A';
+
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(amount);
   }
 
-  getExchangeRate(expense: any): string {
+  getExchangeRate(expense: any, groupCurrency: string): string {
     if (expense.convertedAmount && expense.totalAmount) {
       const rate = expense.convertedAmount / expense.totalAmount;
-      return `(1 ${expense.currency} = ${rate.toFixed(4)} ${
-        expense.groupCurrency
-      })`;
+      return `(1 ${expense.currency} = ${rate.toFixed(4)} ${groupCurrency})`;
     }
     return '';
   }

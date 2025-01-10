@@ -132,6 +132,20 @@
                 />
                 <span class="currency-label">{{ expense.currency }}</span>
               </div>
+              <!-- Add this block to show converted amount -->
+              <div
+                class="converted-amount"
+                *ngIf="
+                  expense.currency !== group.currency &&
+                  getMemberPayment(member.id).convertedAmount
+                "
+              >
+                ≈
+                {{
+                  getMemberPayment(member.id).convertedAmount
+                    | currency : group.currency
+                }}
+              </div>
             </div>
           </div>
         </div>

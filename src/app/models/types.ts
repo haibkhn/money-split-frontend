@@ -8,6 +8,7 @@ export interface Member {
 export interface Payer {
   id: string;
   amount: number;
+  convertedAmount?: number;
   member: Member;
 }
 
@@ -46,6 +47,7 @@ export interface Group {
 export interface PayerDto {
   memberId: string;
   amount: number;
+  convertedAmount?: number;
 }
 
 export interface ParticipantDto {

@@ -62,13 +62,11 @@ export class GroupHeaderComponent implements OnInit {
 
     // Calculate total expenses with proper number conversion
     this.totalExpenses = (group.expenses || []).reduce((sum, expense) => {
-      const amount = Number(
-        expense.convertedAmount || expense.totalAmount || 0
-      );
+      const amount = Number(expense.convertedAmount || 0);
       return Number((sum + amount).toFixed(2));
     }, 0);
 
-    // Calculate each member's spending
+    // Calculate each member's spending using converted amounts
     this.memberSpending = (group.members || []).map((member) => {
       const amountSpent = (group.expenses || []).reduce((sum, expense) => {
         // Find payments by this member
@@ -76,9 +74,14 @@ export class GroupHeaderComponent implements OnInit {
           (payer) => payer.member.id === member.id
         );
 
-        // Sum up all payments
+        // Sum up all payments using convertedAmount
         const totalPaid = memberPayments.reduce((paymentSum, payer) => {
-          return paymentSum + Number(payer.amount || 0);
+          // Use convertedAmount if currencies differ, otherwise use amount
+          const paymentAmount =
+            expense.currency !== group.currency
+              ? Number(payer.convertedAmount || 0)
+              : Number(payer.amount || 0);
+          return paymentSum + paymentAmount;
         }, 0);
 
         return sum + totalPaid;
@@ -89,13 +92,6 @@ export class GroupHeaderComponent implements OnInit {
         amountSpent: Number(amountSpent.toFixed(2)),
       };
     });
-
-    // Debug logging
-    // console.log('Member spending calculation:', {
-    //   members: group.members,
-    //   expenses: group.expenses,
-    //   result: this.memberSpending,
-    // });
   }
 
   toggleEditName() {
