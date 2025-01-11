@@ -12,7 +12,7 @@
     "test": "ng test",
     "serve:ssr:money-split-frontend": "node dist/money-split-frontend/server/server.mjs"
   },
-  "private": true,
+  "private": false,
   "dependencies": {
     "@angular/animations": "^19.0.0",
     "@angular/common": "^19.0.0",
