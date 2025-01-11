@@ -38,7 +38,7 @@
       <div class="member-info">
         <span class="name">{{ member.name }}</span>
         <span class="balance" [class]="getBalanceClass(member.balance)">
-          {{ member.balance | currency : group.currency }}
+          {{ formatBalance(member.balance) | currency : group.currency }}
         </span>
       </div>
       <button

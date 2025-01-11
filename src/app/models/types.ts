@@ -1,18 +1,21 @@
-// models/types.ts
 export interface Member {
   id: string;
   name: string;
   balance: number;
+  groupId: string;
 }
 
 export interface Payer {
-  memberId: string;
+  id: string;
   amount: number;
+  convertedAmount?: number;
+  member: Member;
 }
 
 export interface Participant {
-  memberId: string;
+  id: string;
   share: number;
+  member: Member;
 }
 
 export interface Currency {
@@ -24,12 +27,13 @@ export interface Expense {
   id: string;
   description: string;
   totalAmount: number;
-  currency: string; // Currency used for this expense
-  convertedAmount: number; // Amount in group's base currency
+  currency: string;
+  convertedAmount: number;
   payers: Payer[];
   participants: Participant[];
   date: string;
-  splitType: 'equal' | 'custom';
+  splitType?: 'equal' | 'custom';
+  groupId: string;
 }
 
 export interface Group {
@@ -38,4 +42,27 @@ export interface Group {
   currency: string; // Base currency for the group
   members: Member[];
   expenses: Expense[];
+}
+
+export interface PayerDto {
+  memberId: string;
+  amount: number;
+  convertedAmount?: number;
+}
+
+export interface ParticipantDto {
+  memberId: string;
+  share: number;
+}
+
+export interface CreateExpenseDto {
+  description: string;
+  totalAmount: number;
+  currency: string;
+  convertedAmount: number;
+  payers: PayerDto[];
+  participants: ParticipantDto[];
+  date: string;
+  splitType?: 'equal' | 'custom';
+  groupId: string;
 }

@@ -4,7 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { inject } from '@angular/core';
 import { GroupService } from '../../../../services/group.service';
 import { take } from 'rxjs';
-import { Currency } from '../../../../models/types';
+import {
+  CreateExpenseDto,
+  Currency,
+  ParticipantDto,
+  PayerDto,
+} from '../../../../models/types';
 import { CurrencyService } from '../../../../services/currency.service';
 import { NotificationService } from '../../../../services/notification.service';
 
@@ -32,10 +37,10 @@ export class ExpenseFormComponent {
   expense = {
     description: '',
     totalAmount: 0,
-    currency: 'EUR', // Default currency
+    currency: 'EUR',
     convertedAmount: 0,
-    payers: [{ memberId: '', amount: 0 }],
-    participants: [] as Array<{ memberId: string; share: number }>,
+    payers: [{ memberId: '', amount: 0, convertedAmount: 0 }] as PayerDto[],
+    participants: [] as ParticipantDto[],
     date: new Date().toISOString().split('T')[0],
     splitType: 'equal' as 'equal' | 'custom',
   };
@@ -43,6 +48,18 @@ export class ExpenseFormComponent {
   showForm = false;
   isMultiplePayers = false;
   includeEveryone = true;
+
+  constructor() {
+    // Subscribe to group changes to dynamically handle new members
+    this.group$.subscribe((group) => {
+      if (group && this.includeEveryone) {
+        this.expense.participants = group.members.map((member) => ({
+          memberId: member.id,
+          share: this.expense.totalAmount / group.members.length,
+        }));
+      }
+    });
+  }
 
   ngOnInit() {
     this.loadCurrencies();
@@ -87,38 +104,6 @@ export class ExpenseFormComponent {
     });
   }
 
-  constructor() {
-    // Subscribe to group changes to dynamically handle new members
-    this.group$.subscribe((group) => {
-      if (group && this.includeEveryone) {
-        this.expense.participants = group.members.map((member) => ({
-          memberId: member.id,
-          share: this.expense.totalAmount / group.members.length,
-        }));
-      }
-    });
-  }
-
-  addPayer() {
-    this.expense.payers.push({ memberId: '', amount: 0 });
-  }
-
-  removePayer(index: number) {
-    this.expense.payers.splice(index, 1);
-  }
-
-  updatePayerAmount() {
-    const amount = this.parseNumber(this.displayAmount);
-    this.expense.totalAmount = amount;
-
-    if (this.expense.payers.length > 0) {
-      const equalAmount = amount / this.expense.payers.length;
-      this.expense.payers.forEach((payer) => {
-        payer.amount = equalAmount;
-      });
-    }
-  }
-
   toggleParticipant(memberId: string) {
     const index = this.expense.participants.findIndex(
       (p) => p.memberId === memberId
@@ -137,30 +122,12 @@ export class ExpenseFormComponent {
       this.expense.splitType === 'equal' &&
       this.expense.participants.length > 0
     ) {
-      const perPersonShare =
-        this.expense.convertedAmount / this.expense.participants.length;
-      this.expense.participants.forEach((participant) => {
-        participant.share = perPersonShare;
-      });
-    }
-  }
+      // Ensure we're working with numbers
+      const totalAmount = Number(this.expense.convertedAmount);
+      const perPersonShare = totalAmount / this.expense.participants.length;
 
-  toggleIncludeEveryone() {
-    if (!this.includeEveryone && this.expense.participants.length > 0) {
-      const confirmReset = window.confirm(
-        'Switching to "Include Everyone" will reset your participant selections. Proceed?'
-      );
-      if (!confirmReset) {
-        return;
-      }
-    }
-    this.includeEveryone = !this.includeEveryone;
-    if (this.includeEveryone) {
-      this.group$.pipe(take(1)).subscribe((group) => {
-        this.expense.participants = group!.members.map((member) => ({
-          memberId: member.id,
-          share: this.expense.totalAmount / group!.members.length,
-        }));
+      this.expense.participants.forEach((participant) => {
+        participant.share = Number(perPersonShare.toFixed(2)); // Round to 2 decimal places
       });
     }
   }
@@ -168,107 +135,70 @@ export class ExpenseFormComponent {
   async addExpense() {
     if (!this.expense.description || this.expense.totalAmount <= 0) {
       this.notificationService.show(
-        'Please enter a valid description and total amount.'
+        'Please enter a valid description and total amount'
       );
       return;
-    }
-
-    // Perform validation only if "Multiple Payers" is selected
-    if (this.isMultiplePayers) {
-      const totalFromPayers = this.expense.payers.reduce(
-        (sum, payer) => sum + (payer.amount || 0),
-        0
-      );
-
-      // Check if totals match (allowing for small floating point differences)
-      if (Math.abs(totalFromPayers - this.expense.totalAmount) > 0.01) {
-        this.notificationService.show(
-          `Total amount (${this.formatNumber(
-            this.expense.totalAmount
-          )}) doesn't match sum of individual payments (${this.formatNumber(
-            totalFromPayers
-          )})`
-        );
-        return;
-      }
     }
 
     this.group$.pipe(take(1)).subscribe(async (group) => {
       if (!group) return;
 
+      // Validate multiple payers total matches using original amounts
+      if (this.isMultiplePayers) {
+        const totalPaidOriginal = this.expense.payers.reduce(
+          (sum, payer) => sum + (payer.amount || 0),
+          0
+        );
+
+        // Check if original amounts match (allowing for small floating point differences)
+        if (Math.abs(totalPaidOriginal - this.expense.totalAmount) > 0.01) {
+          this.notificationService.show(
+            `Total amount (${this.formatNumber(this.expense.totalAmount)} ${
+              this.expense.currency
+            }) doesn't match sum of individual payments (${this.formatNumber(
+              totalPaidOriginal
+            )} ${this.expense.currency})`
+          );
+          return;
+        }
+
+        // If currencies are different, ensure all payers have converted amounts
+        if (this.expense.currency !== group.currency) {
+          const conversionPromises = this.expense.payers
+            .filter((payer) => payer.amount > 0)
+            .map(async (payer) => {
+              const converted = await this.currencyService
+                .convertCurrency(
+                  payer.amount,
+                  this.expense.currency,
+                  group.currency
+                )
+                .toPromise();
+              payer.convertedAmount = converted ?? payer.amount;
+            });
+
+          await Promise.all(conversionPromises);
+        } else {
+          // If currencies are the same, convertedAmount equals amount
+          this.expense.payers.forEach((payer) => {
+            payer.convertedAmount = payer.amount;
+          });
+        }
+      }
+
       try {
-        // Create base expense
-        const newExpense = {
-          id: Date.now().toString(),
+        const newExpense: CreateExpenseDto = {
           description: this.expense.description,
           totalAmount: this.expense.totalAmount,
           currency: this.expense.currency,
-          convertedAmount: 0,
-          payers: [...this.expense.payers],
-          participants: [...this.expense.participants],
+          convertedAmount: this.expense.convertedAmount,
+          payers: this.expense.payers,
+          participants: this.expense.participants,
           date: this.expense.date,
           splitType: this.expense.splitType,
+          groupId: group.id,
         };
 
-        // Handle currency conversion
-        if (newExpense.currency !== group.currency) {
-          // Convert total amount
-          const convertedTotal = await this.currencyService
-            .convertCurrency(
-              newExpense.totalAmount,
-              newExpense.currency,
-              group.currency
-            )
-            .toPromise();
-
-          newExpense.convertedAmount = convertedTotal ?? newExpense.totalAmount;
-
-          // Convert individual payer amounts
-          if (this.isMultiplePayers) {
-            // Create new array for converted payer amounts
-            const convertedPayers = await Promise.all(
-              newExpense.payers.map(async (payer) => {
-                const convertedAmount = await this.currencyService
-                  .convertCurrency(
-                    payer.amount,
-                    newExpense.currency,
-                    group.currency
-                  )
-                  .toPromise();
-
-                return {
-                  ...payer,
-                  amount: convertedAmount ?? payer.amount,
-                };
-              })
-            );
-            newExpense.payers = convertedPayers;
-          }
-        } else {
-          newExpense.convertedAmount = newExpense.totalAmount;
-        }
-
-        // Update participant shares based on converted amount
-        if (this.includeEveryone) {
-          const perPersonShare =
-            newExpense.convertedAmount / group.members.length;
-          newExpense.participants = group.members.map((member) => ({
-            memberId: member.id,
-            share: perPersonShare,
-          }));
-        } else {
-          // Update custom participant shares based on converted amount
-          const shareRatio =
-            newExpense.convertedAmount / newExpense.totalAmount;
-          newExpense.participants = newExpense.participants.map(
-            (participant) => ({
-              ...participant,
-              share: participant.share * shareRatio,
-            })
-          );
-        }
-
-        // Add the expense
         this.groupService.addExpense(group.id, newExpense);
 
         setTimeout(() => {
@@ -315,7 +245,7 @@ export class ExpenseFormComponent {
       if (!group) return;
 
       try {
-        // Only convert if currencies are different
+        // Convert total amount if currencies are different
         if (this.expense.currency !== group.currency) {
           const converted = await this.currencyService
             .convertCurrency(
@@ -330,25 +260,39 @@ export class ExpenseFormComponent {
           this.expense.convertedAmount = this.expense.totalAmount;
         }
 
-        // The condition we're checking
-        if (this.expense.payers.length > 0 && this.expense.payers[0].memberId) {
-          // console.log('Updating payer amounts');
-          const equalAmount =
-            this.expense.convertedAmount / this.expense.payers.length;
-          this.expense.payers.forEach((payer) => {
-            payer.amount = equalAmount;
-          });
-          // console.log('Payer Amounts updated:', this.expense.payers);
-        } else {
-          console.log('Skipping payer amount update because:', {
-            'has payers': this.expense.payers.length > 0,
-            'has valid memberId': Boolean(this.expense.payers[0]?.memberId),
-          });
+        // Handle payer amounts and conversion
+        if (this.expense.payers.length > 0) {
+          if (this.isMultiplePayers) {
+            // For multiple payers, convert each payer's amount individually
+            await Promise.all(
+              this.expense.payers.map(async (payer) => {
+                if (
+                  this.expense.currency !== group.currency &&
+                  payer.amount > 0
+                ) {
+                  const convertedAmount = await this.currencyService
+                    .convertCurrency(
+                      payer.amount,
+                      this.expense.currency,
+                      group.currency
+                    )
+                    .toPromise();
+                  payer.convertedAmount = convertedAmount ?? payer.amount;
+                } else {
+                  payer.convertedAmount = payer.amount;
+                }
+              })
+            );
+          } else {
+            // Single payer gets the full converted amount
+            this.expense.payers[0].amount = this.expense.totalAmount;
+            this.expense.payers[0].convertedAmount =
+              this.expense.convertedAmount;
+          }
         }
 
-        // Update participant shares only if we have participants
+        // Update participant shares based on converted amount
         if (this.includeEveryone) {
-          // If everyone is included, add all members as participants
           this.expense.participants = group.members.map((member) => ({
             memberId: member.id,
             share: this.expense.convertedAmount / group.members.length,
@@ -360,11 +304,13 @@ export class ExpenseFormComponent {
             participant.share = equalShare;
           });
         }
-        // console.log('Participant Shares:', this.expense.participants);
 
         this.cdr.detectChanges();
       } catch (error) {
         console.error('Currency conversion failed:', error);
+        this.notificationService.show(
+          'Failed to convert currency. Please try again.'
+        );
       }
     });
   }
@@ -386,15 +332,17 @@ export class ExpenseFormComponent {
   onAmountInput(event: Event) {
     const input = event.target as HTMLInputElement;
 
-    // Remove any non-numeric characters except decimal point
-    const rawValue = input.value.replace(/[^\d.]/g, '');
+    // Allow only numbers and a single decimal point
+    const rawValue = input.value
+      .replace(/[^0-9.]/g, '')
+      .replace(/(\..*?)\..*/g, '$1');
 
     // Parse the value as a float for calculations
-    const numericValue = parseFloat(rawValue) || 0;
-    this.expense.totalAmount = numericValue;
+    const numericValue = parseFloat(rawValue) || null;
+    this.expense.totalAmount = numericValue ?? 0;
 
-    // Format the value with commas for display
-    input.value = this.formatNumber(numericValue);
+    // Update the input value to reflect the properly formatted number
+    input.value = rawValue;
 
     // Trigger conversion update
     this.updateAmountAndShares();
@@ -411,17 +359,23 @@ export class ExpenseFormComponent {
 
   onPayerAmountInput(event: Event, memberId: string) {
     const input = event.target as HTMLInputElement;
-    let value = input.value;
 
-    // Format the display value
-    const formattedValue = this.formatNumberInput(value);
-    input.value = formattedValue;
+    // Allow only numbers and a single decimal point
+    const rawValue = input.value
+      .replace(/[^0-9.]/g, '')
+      .replace(/(\..*?)\..*/g, '$1');
 
-    // Update payer amount in original currency
+    // Parse the value as a float
+    const numericValue = parseFloat(rawValue) || null;
+
+    // Update the payer's amount in the model
     const payer = this.expense.payers.find((p) => p.memberId === memberId);
     if (payer) {
-      payer.amount = parseFloat(value.replace(/,/g, '')) || 0;
+      payer.amount = numericValue ?? 0;
     }
+
+    // Update the input value to reflect the properly formatted number
+    input.value = rawValue;
   }
 
   getTotalPaid(): number {
@@ -435,10 +389,10 @@ export class ExpenseFormComponent {
     return Math.max(0, this.expense.totalAmount - this.getTotalPaid());
   }
 
-  getMemberPayment(memberId: string) {
+  getMemberPayment(memberId: string): PayerDto {
     let payer = this.expense.payers.find((p) => p.memberId === memberId);
     if (!payer) {
-      payer = { memberId, amount: 0 };
+      payer = { memberId, amount: 0, convertedAmount: 0 };
       this.expense.payers.push(payer);
     }
     return payer;
@@ -450,49 +404,15 @@ export class ExpenseFormComponent {
     if (this.isMultiplePayers) {
       this.group$.pipe(take(1)).subscribe((group) => {
         if (group) {
-          // Initialize all members with 0 amount
           this.expense.payers = group.members.map((member) => ({
             memberId: member.id,
             amount: 0,
+            convertedAmount: 0,
           }));
         }
       });
     } else {
-      // Reset to single payer
-      this.expense.payers = [{ memberId: '', amount: 0 }];
+      this.expense.payers = [{ memberId: '', amount: 0, convertedAmount: 0 }];
     }
-  }
-
-  // For payment progress display
-  getProgressText(): string {
-    const totalPaid = this.getTotalPaid();
-    const total = this.expense.totalAmount;
-
-    return `${this.formatNumber(totalPaid)} of ${this.formatNumber(total)} ${
-      this.expense.currency
-    } paid`;
-  }
-
-  // Add this to your component
-  isPaymentTotalValid(): boolean {
-    const totalPaid = this.getTotalPaid();
-    return Math.abs(totalPaid - this.expense.totalAmount) < 0.01;
-  }
-
-  formatNumberInput(value: string): string {
-    // Remove existing commas and non-numeric characters except decimal
-    value = value.replace(/,/g, '').replace(/[^\d.]/g, '');
-
-    // If empty or just decimal point, return empty
-    if (!value || value === '.') return '';
-
-    // Split number into integer and decimal parts
-    let [integer, decimal] = value.split('.');
-
-    // Add commas to integer part
-    integer = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-
-    // Return with decimal if exists
-    return decimal ? `${integer}.${decimal}` : integer;
   }
 }

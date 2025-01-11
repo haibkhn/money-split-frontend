@@ -11,13 +11,13 @@
           <span class="description">{{ expense.description }}</span>
           <div class="amount-container">
             <span class="amount">
-              {{ expense.totalAmount | currency : expense.currency }}
+              {{ formatAmount(expense.totalAmount, expense.currency) }}
             </span>
             <span
               class="converted-amount"
-              *ngIf="expense.currency !== group.currency"
+              *ngIf="isCurrencyDifferent(expense, group.currency)"
             >
-              ≈ {{ expense.convertedAmount | currency : group.currency }}
+              ≈ {{ formatAmount(expense.convertedAmount, group.currency) }}
             </span>
           </div>
         </div>
@@ -32,10 +32,17 @@
           <span class="label">Paid by:</span>
           <ng-container *ngFor="let payer of expense.payers; let last = last">
             <span class="payer">
-              {{ getMemberName(group, payer.memberId) }}
-              ({{ payer.amount | currency : group.currency }}){{
-                !last ? "," : ""
-              }}
+              {{ getMemberName(group, payer) }}
+              <span class="payer-amount">
+                ({{ formatAmount(payer.amount, expense.currency) }}
+                <ng-container
+                  *ngIf="isCurrencyDifferent(expense, group.currency)"
+                >
+                  ≈ {{ formatAmount(payer.convertedAmount, group.currency) }}
+                </ng-container>
+                )
+              </span>
+              {{ !last ? "," : "" }}
             </span>
           </ng-container>
         </div>
@@ -46,7 +53,12 @@
           <span class="participants">
             {{ getParticipantNames(group, expense.participants) }}
           </span>
-          <span class="split-type">{{ expense.splitType }} split</span>
+          <span
+            class="exchange-rate"
+            *ngIf="isCurrencyDifferent(expense, group.currency)"
+          >
+            {{ getExchangeRate(expense, group.currency) }}
+          </span>
         </div>
       </div>
     </div>

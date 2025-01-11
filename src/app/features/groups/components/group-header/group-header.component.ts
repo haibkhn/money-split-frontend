@@ -37,37 +37,60 @@ export class GroupHeaderComponent implements OnInit {
   private notificationService = inject(NotificationService);
 
   ngOnInit() {
-    this.group$.subscribe((group: Group | null) => {
-      if (group) {
-        this.groupName = group.name;
-        this.memberCount = group.members.length;
-        this.groupCurrency = group.currency;
+    // Load group data when component initializes
+    if (this.groupId) {
+      this.groupService.loadGroup(this.groupId);
+    }
 
-        // Calculate total expenses
-        this.totalExpenses = group.expenses.reduce(
-          (sum, expense) =>
-            sum + (expense.convertedAmount || expense.totalAmount),
-          0
+    this.group$.subscribe((group: Group | null) => {
+      if (!group) return; // Exit early if no group
+
+      try {
+        this.updateGroupData(group);
+        this.cdr.markForCheck(); // Use markForCheck instead of detectChanges
+      } catch (error) {
+        console.error('Error processing group data:', error);
+        this.notificationService.show('Error loading group data', 'error');
+      }
+    });
+  }
+
+  private updateGroupData(group: Group) {
+    this.groupName = group.name || 'My Group';
+    this.memberCount = group.members?.length || 0;
+    this.groupCurrency = group.currency || 'EUR';
+
+    // Calculate total expenses with proper number conversion
+    this.totalExpenses = (group.expenses || []).reduce((sum, expense) => {
+      const amount = Number(expense.convertedAmount || 0);
+      return Number((sum + amount).toFixed(2));
+    }, 0);
+
+    // Calculate each member's spending using converted amounts
+    this.memberSpending = (group.members || []).map((member) => {
+      const amountSpent = (group.expenses || []).reduce((sum, expense) => {
+        // Find payments by this member
+        const memberPayments = expense.payers.filter(
+          (payer) => payer.member.id === member.id
         );
 
-        // Calculate each member's spending
-        this.memberSpending = group.members.map((member) => {
-          const amountSpent = group.expenses
-            .filter((expense) =>
-              expense.payers.some((payer) => payer.memberId === member.id)
-            )
-            .reduce((sum, expense) => {
-              const payer = expense.payers.find(
-                (payer) => payer.memberId === member.id
-              );
-              return sum + (payer?.amount || 0);
-            }, 0);
+        // Sum up all payments using convertedAmount
+        const totalPaid = memberPayments.reduce((paymentSum, payer) => {
+          // Use convertedAmount if currencies differ, otherwise use amount
+          const paymentAmount =
+            expense.currency !== group.currency
+              ? Number(payer.convertedAmount || 0)
+              : Number(payer.amount || 0);
+          return paymentSum + paymentAmount;
+        }, 0);
 
-          return { name: member.name, amountSpent };
-        });
+        return sum + totalPaid;
+      }, 0);
 
-        this.cdr.detectChanges();
-      }
+      return {
+        name: member.name,
+        amountSpent: Number(amountSpent.toFixed(2)),
+      };
     });
   }
 
@@ -75,18 +98,48 @@ export class GroupHeaderComponent implements OnInit {
     this.isEditing = !this.isEditing;
 
     if (!this.isEditing) {
-      this.groupService.currentGroup$.pipe(take(1)).subscribe((group) => {
-        if (group) {
-          this.groupService.saveGroup({ ...group, name: this.groupName });
-        }
+      this.group$.pipe(take(1)).subscribe((group) => {
+        if (!group) return;
+
+        this.groupService.saveGroup({
+          ...group,
+          name: this.groupName.trim() || 'My Group',
+        });
       });
     }
   }
 
   shareGroup() {
-    const url = window.location.href;
-    navigator.clipboard.writeText(url).then(() => {
-      this.notificationService.show('Group link copied to clipboard!');
-    });
+    try {
+      const url = window.location.href;
+      navigator.clipboard.writeText(url).then(
+        () => {
+          this.notificationService.show('Group link copied to clipboard!');
+        },
+        () => {
+          this.notificationService.show('Failed to copy link', 'error');
+        }
+      );
+    } catch (error) {
+      console.error('Error sharing group:', error);
+      this.notificationService.show('Failed to share group', 'error');
+    }
+  }
+
+  formatAmount(value: number | string | null): number {
+    if (value === null || value === undefined) return 0;
+    const num = Number(value);
+    return Number(isNaN(num) ? 0 : num.toFixed(2));
+  }
+
+  // Helper method to safely get member ID
+  private getMemberId(payer: any): string | undefined {
+    return payer?.memberId || payer?.member?.id;
+  }
+
+  // Check if amount is valid number
+  isValidAmount(amount: any): boolean {
+    const num = Number(amount);
+    return !isNaN(num) && isFinite(num);
   }
 }

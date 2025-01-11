@@ -1,294 +1,232 @@
-import { inject, Injectable } from '@angular/core';
-import { Group, Member, Expense } from '../models/types';
-import { BehaviorSubject, take } from 'rxjs';
+import { inject, Injectable, PLATFORM_ID } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Group, Member, Expense, CreateExpenseDto } from '../models/types';
+import { BehaviorSubject, take, catchError, EMPTY, finalize } from 'rxjs';
 import { NotificationService } from './notification.service';
+import { environment } from '../../environment/environment';
+import { isPlatformBrowser } from '@angular/common';
+import { UrlService } from './url.service';
 
 @Injectable({
   providedIn: 'root',
 })
 export class GroupService {
+  private apiUrl = environment.apiUrl;
   private currentGroup = new BehaviorSubject<Group | null>(null);
   currentGroup$ = this.currentGroup.asObservable();
-
-  private notificationService = inject(NotificationService);
-
-  // Add a separate BehaviorSubject for settlements
+  private isLoading = false;
   private settlements = new BehaviorSubject<
     Array<{ from: string; to: string; amount: number }>
   >([]);
   settlements$ = this.settlements.asObservable();
 
+  private platformId = inject(PLATFORM_ID);
+  private http = inject(HttpClient);
+  private notificationService = inject(NotificationService);
+  private urlService = inject(UrlService);
+
+  // Create group now makes an HTTP POST request
   createGroup(group: Group) {
-    this.currentGroup.next(group);
-    this.saveGroup(group);
+    return this.http
+      .post<Group>(`${this.apiUrl}/groups`, group)
+      .pipe(
+        catchError((error) => {
+          console.error('Error creating group:', error);
+          if (isPlatformBrowser(this.platformId)) {
+            this.notificationService.show('Failed to create group', 'error');
+          }
+          return EMPTY;
+        })
+      )
+      .subscribe((createdGroup) => {
+        if (createdGroup) {
+          // Ensure members and expenses arrays exist
+          createdGroup.members = [];
+          createdGroup.expenses = [];
+
+          this.currentGroup.next(createdGroup);
+          if (isPlatformBrowser(this.platformId)) {
+            this.notificationService.show('Group created successfully');
+          }
+        }
+      });
   }
 
+  // Load group now fetches from the backend
   loadGroup(groupId: string) {
-    // Check if we're in a browser environment
-    if (typeof window !== 'undefined') {
-      // Try to get existing group from localStorage
-      const savedGroup = localStorage.getItem(`group_${groupId}`);
+    const encodedId = this.urlService.encodeId(groupId);
 
-      if (savedGroup) {
-        // If group exists in localStorage, load it
-        const group = JSON.parse(savedGroup);
-        this.currentGroup.next(group);
+    this.http
+      .get<Group>(`${this.apiUrl}/groups/${encodedId}`)
+      .pipe(
+        catchError((error) => {
+          console.error('Error loading group:', error);
+          this.notificationService.show('Failed to load group', 'error');
+          return EMPTY;
+        })
+      )
+      .subscribe((group) => {
+        if (group) {
+          group.members = group.members || [];
+          group.expenses = group.expenses || [];
+          this.currentGroup.next(group);
 
-        // Recalculate settlements when loading group
-        const newSettlements = this.getSettlementSuggestions(group);
-        this.settlements.next(newSettlements);
-      } else {
-        // If no group exists, create new one
-        const newGroup: Group = {
-          id: groupId,
-          name: 'New Group',
-          currency: 'EUR',
-          members: [],
-          expenses: [],
-        };
-
-        this.currentGroup.next(newGroup);
-        this.settlements.next([]); // Clear settlements for new group
-        // Save the new group to localStorage
-        localStorage.setItem(`group_${groupId}`, JSON.stringify(newGroup));
-      }
-    } else {
-      // Fallback for non-browser environment
-      const newGroup: Group = {
-        id: groupId,
-        name: 'New Group',
-        currency: 'EUR',
-        members: [],
-        expenses: [],
-      };
-
-      this.currentGroup.next(newGroup);
-      this.settlements.next([]); // Clear settlements
-    }
+          // Calculate settlements whenever group is loaded
+          const newSettlements = this.getSettlementSuggestions(group);
+          this.settlements.next(newSettlements);
+        }
+      });
   }
 
+  // Save group now updates the backend
   saveGroup(group: Group) {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(`group_${group.id}`, JSON.stringify(group));
-    }
-    this.currentGroup.next(group);
+    this.http
+      .patch<Group>(`${this.apiUrl}/groups/${group.id}`, group)
+      .subscribe({
+        next: (updatedGroup) => {
+          this.currentGroup.next(updatedGroup);
+          if (isPlatformBrowser(this.platformId)) {
+            this.notificationService.show('Group updated successfully');
+          }
+        },
+        error: (error) => {
+          if (isPlatformBrowser(this.platformId)) {
+            this.notificationService.show('Failed to update group', 'error');
+          }
+          console.error('Error updating group:', error);
+        },
+      });
   }
 
   addMember(groupId: string, name: string) {
-    this.currentGroup$.pipe(take(1)).subscribe((group) => {
-      if (!group) return;
-
-      const newMember: Member = {
-        id: Date.now().toString(),
-        name,
-        balance: 0,
-      };
-
-      const updatedGroup = {
-        ...group,
-        members: [...group.members, newMember],
-      };
-
-      // Update group but don't recalculate settlements
-      this.currentGroup.next(updatedGroup);
-
-      // Persist the updated group
-      this.saveGroup(updatedGroup);
-      // Keep existing settlements
-      const currentSettlements = this.settlements.getValue();
-      if (currentSettlements.length > 0) {
-        this.settlements.next(currentSettlements);
-      }
-    });
+    return this.http
+      .post<Member>(`${this.apiUrl}/members`, { name, groupId })
+      .subscribe({
+        next: (newMember) => {
+          this.currentGroup$.pipe(take(1)).subscribe((group) => {
+            if (!group) return;
+            const updatedGroup = {
+              ...group,
+              members: [...group.members, newMember],
+            };
+            this.currentGroup.next(updatedGroup);
+            if (isPlatformBrowser(this.platformId)) {
+              this.notificationService.show('Member added successfully');
+            }
+          });
+        },
+        error: (error) => {
+          if (isPlatformBrowser(this.platformId)) {
+            this.notificationService.show('Failed to add member', 'error');
+          }
+          console.error('Error adding member:', error);
+        },
+      });
   }
 
-  addExpense(groupId: string, expense: Expense) {
-    this.currentGroup$.pipe(take(1)).subscribe((group) => {
-      if (!group) return;
-
-      // console.log('Adding expense:', expense);
-
-      const updatedMembers = group.members.map((member) => {
-        // Calculate what they paid
-        const amountPaid = expense.payers
-          .filter((payer) => payer.memberId === member.id)
-          .reduce((sum, payer) => sum + payer.amount, 0);
-
-        // Calculate what they owe
-        const share =
-          expense.participants.find((p) => p.memberId === member.id)?.share ||
-          0;
-
-        return {
-          ...member,
-          balance: (member.balance || 0) + amountPaid - share,
-        };
+  addExpense(groupId: string, expense: CreateExpenseDto) {
+    return this.http
+      .post<Expense>(`${this.apiUrl}/expenses`, expense)
+      .subscribe({
+        next: () => {
+          this.loadGroup(groupId); // Reload group after adding expense
+        },
+        error: (error) => {
+          console.error('Error adding expense:', error);
+          this.notificationService.show('Failed to add expense', 'error');
+        },
       });
-
-      const updatedGroup = {
-        ...group,
-        expenses: [...group.expenses, expense],
-        members: updatedMembers,
-      };
-
-      // console.log('Updated group after adding expense:', updatedGroup);
-
-      this.saveGroup(updatedGroup);
-
-      const newSettlements = this.getSettlementSuggestions(updatedGroup);
-      this.settlements.next(newSettlements);
-    });
   }
 
   removeMember(groupId: string, memberId: string) {
-    this.currentGroup$.pipe(take(1)).subscribe((group) => {
-      if (!group) return;
-
-      // Check if member has any expenses as a payer or participant
-      const hasExpensesAsPayer = group.expenses.some((expense) =>
-        expense.payers.some((payer) => payer.memberId === memberId)
-      );
-
-      const hasExpensesAsParticipant = group.expenses.some((expense) =>
-        expense.participants.some(
-          (participant) => participant.memberId === memberId
-        )
-      );
-
-      if (hasExpensesAsPayer || hasExpensesAsParticipant) {
-        this.notificationService.show(
-          'Cannot remove member who is involved in existing expenses.',
-          'error'
-        );
-        return;
-      }
-
-      const updatedGroup = {
-        ...group,
-        members: group.members.filter((m) => m.id !== memberId),
-      };
-
-      this.saveGroup(updatedGroup);
+    return this.http.delete(`${this.apiUrl}/members/${memberId}`).subscribe({
+      next: () => {
+        this.currentGroup$.pipe(take(1)).subscribe((group) => {
+          if (!group) return;
+          const updatedGroup = {
+            ...group,
+            members: group.members.filter((m) => m.id !== memberId),
+          };
+          this.currentGroup.next(updatedGroup);
+        });
+      },
+      error: (error) => {
+        if (error.status === 400) {
+          this.notificationService.show(
+            'Cannot remove member who is involved in existing expenses.',
+            'error'
+          );
+        } else {
+          this.notificationService.show('Failed to remove member', 'error');
+        }
+        console.error('Error removing member:', error);
+      },
     });
   }
 
   removeExpense(expenseId: string) {
-    this.currentGroup$.pipe(take(1)).subscribe((group) => {
-      if (!group) return;
-
-      // Remove the expense
-      const updatedExpenses = group.expenses.filter((e) => e.id !== expenseId);
-
-      // Create a copy of the group
-      let updatedGroup: Group = {
-        ...group,
-        expenses: updatedExpenses,
-        // Reset all balances to 0 first
-        members: group.members.map((member) => ({
-          ...member,
-          balance: 0,
-        })),
-      };
-
-      // Recalculate all balances from remaining expenses
-      updatedExpenses.forEach((expense) => {
-        updatedGroup.members.forEach((member) => {
-          // Add what they paid
-          const amountPaid = expense.payers
-            .filter((payer) => payer.memberId === member.id)
-            .reduce((sum, payer) => sum + payer.amount, 0);
-
-          // Subtract what they owe
-          const share =
-            expense.participants.find((p) => p.memberId === member.id)?.share ||
-            0;
-
-          member.balance += amountPaid - share;
+    return this.http.delete(`${this.apiUrl}/expenses/${expenseId}`).subscribe({
+      next: () => {
+        this.currentGroup$.pipe(take(1)).subscribe((group) => {
+          if (!group) return;
+          this.loadGroup(group.id); // Reload entire group after removing expense
         });
-      });
-
-      // Recalculate settlement suggestions with new balances
-      const newSettlements = this.getSettlementSuggestions(updatedGroup);
-
-      // Save everything
-      this.saveGroup(updatedGroup);
-      this.settlements.next(newSettlements);
+      },
+      error: (error) => {
+        console.error('Error removing expense:', error);
+        this.notificationService.show('Failed to remove expense', 'error');
+      },
     });
   }
 
-  calculateBalances(group: Group): void {
-    // Reset all balances
-    const updatedMembers = group.members.map((member) => ({
-      ...member,
-      balance: 0,
-    }));
-    // console.log('Balances reset:', updatedMembers);
+  getSettlementSuggestions(group: Group) {
+    if (!group || !group.members) return [];
 
-    // Recalculate all balances from expenses
-    group.expenses.forEach((expense) => {
-      updatedMembers.forEach((member) => {
-        // Add what they paid
-        const amountPaid = expense.payers
-          .filter((payer) => payer.memberId === member.id)
-          .reduce((sum, payer) => sum + payer.amount, 0);
-
-        // Subtract what they owe
-        const share =
-          expense.participants.find((p) => p.memberId === member.id)?.share ||
-          0;
-
-        member.balance = member.balance + amountPaid - share;
-      });
-    });
-
-    // console.log('Balances after calculation:', updatedMembers);
-
-    // Update the group with new balances
-    const updatedGroup = {
-      ...group,
-      members: updatedMembers,
-    };
-
-    this.currentGroup.next(updatedGroup);
-  }
-
-  // Add a method to get settlement suggestions
-  getSettlementSuggestions(
-    group: Group
-  ): Array<{ from: string; to: string; amount: number }> {
-    // Make a copy of members to avoid modifying the original balances
-    const membersCopy = group.members.map((m) => ({ ...m }));
+    // Make a copy of members to avoid modifying the original
+    const members = group.members
+      .map((m) => ({
+        ...m,
+        balance: Number(m.balance || 0),
+      }))
+      .sort((a, b) => a.balance - b.balance);
 
     const settlements: Array<{ from: string; to: string; amount: number }> = [];
-    const debtors = membersCopy
-      .filter((m) => m.balance < 0)
-      .sort((a, b) => a.balance - b.balance);
-    const creditors = membersCopy
-      .filter((m) => m.balance > 0)
-      .sort((a, b) => b.balance - a.balance);
 
-    while (debtors.length > 0 && creditors.length > 0) {
-      const debtor = debtors[0];
-      const creditor = creditors[0];
+    let i = 0;
+    let j = members.length - 1;
+
+    while (i < j) {
+      const debtor = members[i];
+      const creditor = members[j];
+
+      // Skip members with zero balance
+      if (Math.abs(debtor.balance) < 0.01) {
+        i++;
+        continue;
+      }
+
+      if (Math.abs(creditor.balance) < 0.01) {
+        j--;
+        continue;
+      }
 
       const amount = Math.min(Math.abs(debtor.balance), creditor.balance);
 
-      if (amount > 0.01) {
+      if (amount > 0) {
         settlements.push({
-          from: debtor.id,
-          to: creditor.id,
-          amount: Math.round(amount * 100) / 100,
+          from: debtor.name,
+          to: creditor.name,
+          amount: Number(amount.toFixed(2)),
         });
+
+        debtor.balance += amount;
+        creditor.balance -= amount;
       }
 
-      debtor.balance += amount;
-      creditor.balance -= amount;
-
-      if (Math.abs(debtor.balance) < 0.01) debtors.shift();
-      if (Math.abs(creditor.balance) < 0.01) creditors.shift();
+      if (Math.abs(debtor.balance) < 0.01) i++;
+      if (Math.abs(creditor.balance) < 0.01) j--;
     }
 
-    this.settlements.next(settlements); // Emit updated settlements
     return settlements;
   }
 

@@ -1,12 +1,14 @@
-import { Component, inject, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnInit, inject, PLATFORM_ID, Inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
+import { UrlService } from '../../../../services/url.service';
+import { GroupService } from '../../../../services/group.service';
+import { CommonModule } from '@angular/common';
 import { GroupHeaderComponent } from '../group-header/group-header.component';
 import { MemberListComponent } from '../member-list/member-list.component';
-import { GroupService } from '../../../../services/group.service';
 import { ExpenseFormComponent } from '../expense-form/expense-form.component';
 import { ExpenseListComponent } from '../expense-list/expense-list.component';
 import { SettlementListComponent } from '../settlement-list/settlement-list.component';
+import { isPlatformBrowser } from '@angular/common';
 
 @Component({
   selector: 'app-group-page',
@@ -23,17 +25,22 @@ import { SettlementListComponent } from '../settlement-list/settlement-list.comp
   styleUrls: ['./group-page.component.scss'],
 })
 export class GroupPageComponent implements OnInit {
-  groupId: string = '';
   private route = inject(ActivatedRoute);
-  private groupService = inject(GroupService);
+  private urlService = inject(UrlService);
+  protected groupService = inject(GroupService);
+  private platformId = inject(PLATFORM_ID);
+
+  groupId: string = '';
 
   ngOnInit() {
-    // Load group when component initializes
-    this.route.params.subscribe((params) => {
-      const groupId = params['groupId'];
-      if (groupId) {
-        this.groupService.loadGroup(groupId);
-      }
-    });
+    // Only load group data in browser environment
+    if (isPlatformBrowser(this.platformId)) {
+      this.route.params.subscribe((params) => {
+        const shortId = params['groupId'];
+        this.groupId = shortId;
+        const fullId = this.urlService.decodeId(shortId);
+        this.groupService.loadGroup(fullId);
+      });
+    }
   }
 }

@@ -1,4 +1,4 @@
-<header class="group-header">
+<header class="group-header" *ngIf="group$ | async as group">
   <div class="left">
     <h1 *ngIf="!isEditing">{{ groupName }}</h1>
     <input
@@ -23,19 +23,23 @@
   </div>
 </header>
 
-<div class="group-stats">
+<div class="group-stats" *ngIf="group$ | async as group">
   <div class="stat-item">
     <span class="label">Total Expenses</span>
-    <span class="value">{{ totalExpenses | currency : groupCurrency }}</span>
+    <span class="value">
+      {{ formatAmount(totalExpenses) | currency : groupCurrency }}
+    </span>
   </div>
   <div class="stat-item">
     <span class="label">Members</span>
     <span class="value">{{ memberCount }}</span>
   </div>
-  <div class="stat-item" *ngFor="let member of memberSpending">
-    <span class="label">{{ member.name }}</span>
-    <span class="value">
-      {{ member.amountSpent | currency : groupCurrency }}
-    </span>
-  </div>
+  <ng-container *ngIf="memberSpending.length > 0">
+    <div class="stat-item" *ngFor="let member of memberSpending">
+      <span class="label">{{ member.name }}</span>
+      <span class="value">
+        {{ formatAmount(member.amountSpent) | currency : groupCurrency }}
+      </span>
+    </div>
+  </ng-container>
 </div>
