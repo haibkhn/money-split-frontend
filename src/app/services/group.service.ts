@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Group, Member, Expense, CreateExpenseDto } from '../models/types';
 import { BehaviorSubject, take, catchError, EMPTY, finalize } from 'rxjs';
 import { NotificationService } from './notification.service';
-import { environment } from '../../environment/environment';
+import { environment } from '../../environments/environment';
 import { isPlatformBrowser } from '@angular/common';
 import { UrlService } from './url.service';
 
