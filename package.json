@@ -6,6 +6,7 @@
     "start": "ng serve",
     "build": "ng build",
     "build:prod": "ng build --configuration production",
+    "vercel-build": "ng build --configuration production",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "serve:ssr:money-split-frontend": "node dist/money-split-frontend/server/server.mjs"
