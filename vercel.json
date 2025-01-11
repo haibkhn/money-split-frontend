@@ -6,7 +6,7 @@
             "src": "package.json",
             "use": "@vercel/static-build",
             "config": {
-                "distDir": "dist/money-split-frontend",
+                "distDir": "dist/money-split-frontend/browser",
                 "buildCommand": "npm run build:prod"
             }
         }
