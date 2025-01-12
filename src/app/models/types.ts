@@ -42,6 +42,7 @@ export interface Group {
   currency: string; // Base currency for the group
   members: Member[];
   expenses: Expense[];
+  shortUrl?: string;
 }
 
 export interface PayerDto {

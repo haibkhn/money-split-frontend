@@ -67,6 +67,7 @@ export class CreateGroupComponent implements OnInit {
       currency: this.selectedCurrency,
       members: [],
       expenses: [],
+      shortUrl: shortId,
     };
 
     this.groupService.createGroup(newGroup);
